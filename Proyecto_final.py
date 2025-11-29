@@ -4,6 +4,35 @@ import numpy as np
 import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+df = pd.read_csv("8._RUTAS_TRANSPORTE_URBANO_20251011.csv", index_col="codigo")
+print(df.columns)
+
+df_filtrado = df.fillna({"empresa":"BUSETAS AUTONOMA"
+                         ,"capacidad_minima" : df["capacidad_minima"].mean(),
+                         'capacidad_maxima':df["capacidad_maxima"].mean(),
+                        'frecuencia_de_despacho_hora_pico': "00",
+                        'hora_primer_despacho': "05:00:00 a.m.",
+                        'hora_ultimo_despacho': "08:30:00 p.m",})
+
+df_filtrado["empresa_limpia"] = df_filtrado["empresa"].str.replace("OPERACIÓN AUTORIZADA A ", "", regex=False)
+
+df_filtrado = df_filtrado.dropna()
+
+print(df_filtrado.describe())
+
+print(df_filtrado)
+
+
+#añadido de metadatos
+if 'id' not in df.columns:
+    df = df.copy()                         
+    df['id'] = range(1, len(df) + 1)        
+    print("se añadio la columna'id'")
+else:
+    print("'id' ya existe")
+
 
 bloqueado = False      # Para controlar la activación/desactivación
 
@@ -13,66 +42,171 @@ def a():
 def allempresas():
     print("MOSTRAR TODAS LAS EMPRESAS")
 
+def cerrar_y_volver(ventana_actual):
+    # Cerrar la ventana secundaria
+    if ventana_actual is not None:
+        try:
+            ventana_actual.destroy()
+        except:
+            pass
+
 def invempresas(nombre):
-    print("Empresa seleccionada:", nombre)
+
+    # Cerrar SOLO ventanas secundarias, excepto la principal
+    for w in ventana.winfo_children():
+        if isinstance(w, tk.Toplevel):
+            try:
+                w.destroy()
+            except:
+                pass
+    # Ocultar ventana principal
+    ventana.withdraw()
+    # --- Filtrar empresa ---
+    df_emp = df_filtrado[df_filtrado["empresa_limpia"] == nombre]
+
+    if df_emp.empty:
+        tk.messagebox.showerror("Error", "No hay datos para esta empresa")
+        ventana.deiconify()
+        return
+
+    # --- Crear ventana ---
+    ven_emp = tk.Toplevel(ventana)
+    ven_emp.title(f"Estadísticas — {nombre}")
+    ven_emp.geometry("750x700")
+    ven_emp.config(bg="#F5F5F5")
+    ven_emp.transient(ventana)
+    ven_emp.grab_set()
+
+    # ============================================================
+    #                  SCROLLBAR Y CANVAS
+    # ============================================================
+    contenedor = tk.Frame(ven_emp)
+    contenedor.pack(fill="both", expand=True)
+
+    canvas = tk.Canvas(contenedor, bg="#F5F5F5")
+    canvas.pack(side="left", fill="both", expand=True)
+
+    scrollbar = tk.Scrollbar(contenedor, orient="vertical", command=canvas.yview)
+    scrollbar.pack(side="right", fill="y")
+
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    # Para permitir scroll dentro del frame → truco oficial de Tkinter
+    frame_scroll = tk.Frame(canvas, bg="#F5F5F5")
+    canvas.create_window((0, 0), window=frame_scroll, anchor="nw")
+
+    def actualizar_scroll(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    frame_scroll.bind("<Configure>", actualizar_scroll)
+
+    # ============================================================
+    #                        CONTENIDO
+    # ============================================================
+
+    # --------- Título ---------
+    lbl_titulo = tk.Label(
+        frame_scroll,
+        text=f"Empresa: {nombre}",
+        font=("Arial", 18, "bold"),
+        bg="#F5F5F5"
+    )
+    lbl_titulo.pack(pady=20)
+
+    # --------- Gráfica ---------
+    conteo_term = df_emp["terminal"].value_counts()
+    fig, ax = plt.subplots(figsize=(7, 4), dpi=100)
+    conteo_term.plot(kind="bar", color="skyblue", ax=ax)
+
+    ax.set_title(f"Frecuencia de terminales — {nombre}", fontsize=10)
+    ax.set_xlabel("Terminal")
+    ax.set_ylabel("Cantidad")
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+    ax.grid(alpha=0.3)
+
+    frame_graf = tk.Frame(frame_scroll, bg="#F5F5F5")
+    frame_graf.pack(pady=10)
+
+    canvas_graf = FigureCanvasTkAgg(fig, master=frame_graf)
+    canvas_graf.draw()
+    canvas_graf.get_tk_widget().pack()
+
+    # --------- Estadísticas numéricas ---------
+    cant = len(df_emp)
+    cap_max = df_emp["capacidad_maxima"].mean()
+    cap_min = df_emp["capacidad_minima"].mean()
+    frec_pico = df_emp["frecuencia_de_despacho_hora_pico"].mean()
+    frec_valle = df_emp["frecuencia_despacho_hora_valle"].mean()
+
+    texto = (
+        f"• Vehículos registrados: {cant}\n\n"
+        f"• Capacidad Máxima promedio: {round(cap_max, 2)}\n\n"
+        f"• Capacidad Mínima promedio: {round(cap_min, 2)}\n\n"
+        f"• Frecuencia hora pico promedio: {round(frec_pico, 2)}\n\n"
+        f"• Frecuencia hora valle promedio: {round(frec_valle, 2)}"
+    )
+
+    frame_info = tk.Frame(frame_scroll, bg="white", bd=1, relief="solid")
+    frame_info.pack(padx=30, pady=20, fill="x")
+
+    lbl_info = tk.Label(frame_info, text=texto, font=("Arial", 12),
+                        bg="white", justify="left", anchor="w")
+    lbl_info.pack(padx=20, pady=20)
+
+    # --------- Botón volver ---------
+    btn_volver = tk.Button(
+        frame_scroll,
+        text="Volver al menú principal",
+        font=("Arial", 12),
+        width=25,
+        height=2,
+        bg="#D9EAF7",
+        command=lambda: cerrar_y_volver(ven_emp)
+    )
+    btn_volver.pack(pady=20)
 
 # -------------------------------------------------------------------
-# -----  V E N T A N A   D E   E S T A D Í S T I C A S  --------------
+# ----- VENTANA DE SELECCION DE ESTADISTICAS ------------------------
 # -------------------------------------------------------------------
 def estats():
-    global bloqueado
-    bloqueado = False   # Reiniciar cada vez que entra
-
     est_dec = tk.Toplevel(ventana)
+    est_dec.columnconfigure(0, weight=1)
+    est_dec.columnconfigure(1, weight=1)
     est_dec.title("Estadísticas de vehículos")
     est_dec.geometry("450x300")
-    est_dec.transient(ventana)
-    est_dec.grab_set()
 
-    # Texto superior
-    lbl_infoest = tk.Label(est_dec, text="Seleccione una opción:", bg="white", width=20, height=2)
-    lbl_infoest.grid(row=0, column=0, columnspan=2, pady=10)
-
-    # Botón — Todas las empresas
-    btn_all = tk.Button(est_dec, text="Todas las Empresas", width=20, height=2, command=allempresas)
-    btn_all.grid(row=1, column=1, pady=5)
-
-    # LISTA/COMBOBOX — inicialmente bloqueado
     empresas = ["UNITRANSA S.A.", "TRANSCOLOMBIA S.A.", "COTRANDER",
                 "LUSITANIA S.A.", "ORIENTAL DE TRANSPORTES S.A.",
                 "TRANSPORTES SAN JUAN S.A.", "TRANSPORTES PIEDECUESTA S.A."]
 
     list_emp = ttk.Combobox(est_dec, values=empresas, width=35, state="disabled")
     list_emp.set("Seleccione una empresa...")
-    list_emp.grid(row=2, column=0, pady=10)
+    list_emp.grid(row=2, column=0, pady=10, columnspan=2)
 
-    # ----------------------------------------------------------
-    # Función para alternar (activar/desactivar)
-    # ----------------------------------------------------------
-    def toggle_boton():
-        nonlocal btn_all, list_emp
-        global bloqueado
+    btn_ver = tk.Button(est_dec, text="Ver Empresa", width=20,
+                        command=lambda: invempresas(list_emp.get()))
 
-        if bloqueado:
-            btn_all.config(state=tk.NORMAL)
-            list_emp.config(state="disabled")
-        else:
-            btn_all.config(state=tk.DISABLED)
+    def toggle():
+        if list_emp.instate(["disabled"]):   # ← CORREGIDO
             list_emp.config(state="readonly")
+            btn_all.config(state="disabled")
+            btn_ver.config(state=tk.NORMAL)
+        else:
+            list_emp.config(state="disabled")
+            btn_all.config(state="normal")
+            btn_ver.config(state=tk.DISABLED)
 
-        bloqueado = not bloqueado
+    btn_all = tk.Button(est_dec, text="Todas las Empresas", width=20, command=allempresas)
+    btn_all.grid(row=1, column=1)
 
-    # Botón — Empresa Individual
-    btn_inv = tk.Button(est_dec, text="Empresa Individual", width=20, height=2,
-                        command=toggle_boton)
-    btn_inv.grid(row=1, column=0, pady=5)
+    btn_inv = tk.Button(est_dec, text="Empresa Individual", width=20, command=toggle)
+    btn_inv.grid(row=1, column=0)
 
-    # Botón para ver la empresa seleccionada
-    btn_ver = tk.Button(est_dec, text="Ver Empresa", width=20, height=2,
-                        command=lambda: invempresas(list_emp.get())) # cambiar
     btn_ver.grid(row=4, column=0, columnspan=2, pady=10)
+
     boton_cancelar = tk.Button(est_dec, text="Cancelar", width=20, height=2, command=est_dec.destroy)
-    boton_cancelar.grid(row=5, column=0,columnspan=2,pady=5, padx=10)
+    boton_cancelar.grid(row=5, column=0, columnspan=2, pady=5, padx=10)
 
 # -------------------------------------------------------------------
 # -----  V E N T A N A   P R I N C I P A L ---------------------------
@@ -133,31 +267,14 @@ def salir():
 btn_salir = tk.Button(text="Salir", width=20, height=2, command=salir)
 btn_salir.grid(row=5, column=1, pady=10, padx=5)
 
+def cerrar_y_volver(ventana_actual):
+    ventana_actual.destroy()
+    ventana.deiconify()     # Vuelve a mostrar el menú principal
+
+def cerrar_ventana(vent):
+    vent.destroy()
+
 ventana.mainloop()
-
-df = pd.read_csv("8._RUTAS_TRANSPORTE_URBANO_20251011.csv", index_col="codigo")
-print(df.columns)
-
-df_filtrado = df.fillna({"empresa":"BUSETAS AUTONOMA"
-                         ,"capacidad_minima" : df["capacidad_minima"].mean(),
-                         'capacidad_maxima':df["capacidad_maxima"].mean(),
-                        'frecuencia_de_despacho_hora_pico': "00",
-                        'hora_primer_despacho': "05:00:00 a.m.",
-                        'hora_ultimo_despacho': "08:30:00 p.m",})
-df_filtrado = df_filtrado.dropna()
-
-print(df_filtrado.describe())
-
-print(df_filtrado)
-
-
-#añadido de metadatos
-if 'id' not in df.columns:
-    df = df.copy()                         
-    df['id'] = range(1, len(df) + 1)        
-    print("se añadio la columna'id'")
-else:
-    print("'id' ya existe")
 
 #creacion archivo excel; lo ultimito
 df.to_excel("Excel_RUTAS_TRANSPORTE_URBANO.xlsx", index=False)
