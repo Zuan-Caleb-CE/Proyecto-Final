@@ -167,23 +167,22 @@ def invempresas(nombre):
     btn_volver.pack(pady=20)
 
 def visualizacion_rutas():
-    # Close the main window
-    ventana.withdraw()
+    ventana.withdraw() #esconde la ventana principal para que no se vea
 
-    # Create a new window
+    # Crea la nueva ventana
     ventana_visual = tk.Toplevel()
     ventana_visual.title("Visualización de Rutas")
     ventana_visual.geometry("600x400")
     ventana_visual.config(bg="white")
 
     # Add content to the new window
-    label_visual = tk.Label(ventana_visual, text="Visualización de Rutas", font=("Arial", 16), bg="white")
+    label_visual = tk.Label(ventana_visual, text="seleccione una de las dos opciones", font=("Arial", 16), bg="white")
     label_visual.pack(pady=20)
 
     # Button to go back to the main window
     btn_volver = tk.Button(
         ventana_visual,
-        text="Volver al menú principal",
+        text="regresa",
         width=20,
         height=2,
         command=lambda: cerrar_y_volver(ventana_visual)
