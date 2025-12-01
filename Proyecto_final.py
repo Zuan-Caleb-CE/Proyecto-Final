@@ -243,9 +243,9 @@ debug_lugares_terminales_vacios()
 
 """ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
 """ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
-"""ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
 
-
+#-------------------------------------------------------------
+#----- VENTANA DE VISUALIZACION DE RUTAS ------------------------
 #####################################################################################3333
 ##########################################################################################3
 #######################################################################################333
@@ -431,6 +431,171 @@ def visualizacion_rutas():
 ##########################################################################################
 
 
+
+
+
+##############################################################
+############################################################
+
+# -------------------------------------------------------------
+# agregar vehiculo - ventana emergente 4
+# -------------------------------------------------------------
+def ventana_emergente_4(parent):
+    """
+    Crea la ventana emergente tipo 'Formulario' (dos columnas) con:
+    - botones para agregar recorrido/empresa/terminal
+    - varios campos (Entry / Combobox)
+    - botones Guardar y Cancelar
+    parent: la ventana padre (normalmente tu `ventana` o `root`)
+    """
+    # --- Crear Toplevel ---
+    top = tk.Toplevel(parent)
+    top.title("Ventana emergente 4")
+    top.transient(parent)    # mantiene encima de parent
+    top.grab_set()           # hace modal la ventana
+    top.geometry("900x900")  # ajusta al tamaño que quieras
+
+    # Opcional: estilo ttk
+    style = ttk.Style(top)
+    style.theme_use('clam')  # 'clam' funciona bien para personalizar
+    style.configure("TButton", padding=10)
+    style.configure("TEntry", padding=6)
+    style.configure("TLabel", padding=6)
+
+    # Frame principal con padding
+    main = ttk.Frame(top, padding=(20, 20, 20, 20))
+    main.grid(row=0, column=0, sticky="nsew")
+    top.columnconfigure(0, weight=1)
+    top.rowconfigure(0, weight=1)
+
+    # Más control de layout: dos columnas (left / right)
+    left = ttk.Frame(main)
+    right = ttk.Frame(main)
+    left.grid(row=2, column=0, padx=(10, 30), sticky="n")
+    right.grid(row=2, column=1, padx=(30, 10), sticky="n")
+
+    # Encabezado (fila 0)
+    encabezado = ttk.Label(main, text="Seleccione las dos siguientes opciones:", anchor="center")
+    encabezado.grid(row=0, column=0, columnspan=2, pady=(0, 20), sticky="ew")
+
+    # Botón Agrega Recorrido (alineado a la izquierda, arriba)
+    btn_recorrido = ttk.Button(main, text="Agrega Recorrido")
+    btn_recorrido.grid(row=1, column=0, columnspan=1, sticky="w", pady=(0, 12))
+
+    # Entrada grande "Ingrese texto" (fila 1 spanning columns)
+    entrada_texto_principal = ttk.Entry(main, width=90)
+    entrada_texto_principal.insert(0, "")  # placeholder si quieres
+    entrada_texto_principal.grid(row=1, column=0, columnspan=2, pady=(50, 20), sticky="ew")
+
+    # --- Campos izquierda ---
+    # Agrega Empresa + combobox
+    btn_agregar_empresa = ttk.Button(left, text="Agrega Empresa")
+    btn_agregar_empresa.grid(row=0, column=0, pady=(0,8), sticky="w")
+
+    empresa_var = tk.StringVar()
+    combo_empresa = ttk.Combobox(left, textvariable=empresa_var, values=["Empresa A", "Empresa B", "Empresa C"], state="readonly", width=30)
+    combo_empresa.grid(row=1, column=0, pady=(0,12), sticky="w")
+
+    # Capacidad Minima
+    ttk.Label(left, text="Capacidad Minima").grid(row=2, column=0, sticky="w")
+    cap_min_var = tk.StringVar()
+    entry_cap_min = ttk.Entry(left, textvariable=cap_min_var, width=30)
+    entry_cap_min.grid(row=3, column=0, pady=(0,12), sticky="w")
+
+    # Frecuencia despacho hora pico
+    ttk.Label(left, text="Frecuencia de despacho hora pico").grid(row=4, column=0, sticky="w")
+    freq_pico_var = tk.StringVar()
+    entry_freq_pico = ttk.Entry(left, textvariable=freq_pico_var, width=30)
+    entry_freq_pico.grid(row=5, column=0, pady=(0,12), sticky="w")
+
+    # Hora de primer despacho (combobox)
+    ttk.Label(left, text="Hora de primer despacho").grid(row=6, column=0, sticky="w")
+    first_hour_var = tk.StringVar()
+    combo_first_hour = ttk.Combobox(left, textvariable=first_hour_var,
+                                    values=[f"{h:02d}:00" for h in range(0,24)], width=30, state="readonly")
+    combo_first_hour.grid(row=7, column=0, pady=(0,12), sticky="w")
+
+    # Longitud de km
+    ttk.Label(left, text="Longitud de km").grid(row=8, column=0, sticky="w")
+    longitud_var = tk.StringVar()
+    entry_longitud = ttk.Entry(left, textvariable=longitud_var, width=30)
+    entry_longitud.grid(row=9, column=0, pady=(0,20), sticky="w")
+
+    # Cancelar (abajo izquierda)
+    def cancelar():
+        top.destroy()
+
+    btn_cancel = ttk.Button(left, text="Cancelar", command=cancelar)
+    btn_cancel.grid(row=10, column=0, pady=(30,0), sticky="w")
+
+    # --- Campos derecha ---
+    # Agrega Terminal + combobox
+    btn_agregar_terminal = ttk.Button(right, text="Agrega Terminal")
+    btn_agregar_terminal.grid(row=0, column=0, pady=(0,8), sticky="e")
+
+    terminal_var = tk.StringVar()
+    combo_terminal = ttk.Combobox(right, textvariable=terminal_var, values=["Terminal 1", "Terminal 2"], state="readonly", width=30)
+    combo_terminal.grid(row=1, column=0, pady=(0,12), sticky="e")
+
+    # Capacidad Maxima
+    ttk.Label(right, text="Capacidad Maxima").grid(row=2, column=0, sticky="e")
+    cap_max_var = tk.StringVar()
+    entry_cap_max = ttk.Entry(right, textvariable=cap_max_var, width=30)
+    entry_cap_max.grid(row=3, column=0, pady=(0,12), sticky="e")
+
+    # Frecuencia despacho hora valle
+    ttk.Label(right, text="Frecuencia de despacho hora valle").grid(row=4, column=0, sticky="e")
+    freq_valle_var = tk.StringVar()
+    entry_freq_valle = ttk.Entry(right, textvariable=freq_valle_var, width=30)
+    entry_freq_valle.grid(row=5, column=0, pady=(0,12), sticky="e")
+
+    # Hora de ultimo despacho (combobox)
+    ttk.Label(right, text="Hora de ultimo despacho").grid(row=6, column=0, sticky="e")
+    last_hour_var = tk.StringVar()
+    combo_last_hour = ttk.Combobox(right, textvariable=last_hour_var,
+                                   values=[f"{h:02d}:00" for h in range(0,24)], width=30, state="readonly")
+    combo_last_hour.grid(row=7, column=0, pady=(0,12), sticky="e")
+
+    # Clase (combobox)
+    ttk.Label(right, text="Clase").grid(row=8, column=0, sticky="e")
+    clase_var = tk.StringVar()
+    combo_clase = ttk.Combobox(right, textvariable=clase_var, values=["Clase 1", "Clase 2"], state="readonly", width=30)
+    combo_clase.grid(row=9, column=0, pady=(0,20), sticky="e")
+
+    # Guardar (abajo derecha)
+    def guardar():
+        # Aquí recoges los valores y haces lo que necesites (guardar en BD, lista, validar, etc.)
+        data = {
+            "empresa": empresa_var.get(),
+            "terminal": terminal_var.get(),
+            "cap_min": cap_min_var.get(),
+            "cap_max": cap_max_var.get(),
+            "freq_pico": freq_pico_var.get(),
+            "freq_valle": freq_valle_var.get(),
+            "first_hour": first_hour_var.get(),
+            "last_hour": last_hour_var.get(),
+            "longitud": longitud_var.get(),
+            "clase": clase_var.get(),
+            "texto": entrada_texto_principal.get(),
+        }
+        # ejemplo: imprime en consola (o reemplaza por tu lógica)
+        print("Guardando:", data)
+        # cerrar ventana si todo salió bien
+        top.destroy()
+
+    btn_guardar = ttk.Button(right, text="Guardar", command=guardar)
+    btn_guardar.grid(row=10, column=0, pady=(30,0), sticky="e")
+
+    # Ajustes finales: que las columnas escalen bien
+    main.columnconfigure(0, weight=1)
+    main.columnconfigure(1, weight=1)
+    left.columnconfigure(0, weight=1)
+    right.columnconfigure(0, weight=1)
+
+#############################################################################
+##################################################################
+###################################################
+
 # -------------------------------------------------------------------
 # ----- VENTANA DE SELECCION DE ESTADISTICAS ------------------------
 # -------------------------------------------------------------------
@@ -504,12 +669,15 @@ except FileNotFoundError:# para evitar que se mate si no encuentra la imagen
 
 # Botones principales
 btn_estads = tk.Button(text="Estaditicas de Vehiculos", width=20, height=2, command=estats)
-btn_agregar = tk.Button(text="Agregar vehiculo", width=20, height=2, command=a)
+btn_agregar = tk.Button(text="Agregar vehiculo", width=20, height=2, command=lambda: ventana_emergente_4(ventana))
 btn_visual = tk.Button(text="Visualización de rutas", width=20, height=2, command=visualizacion_rutas)
 
 btn_estads.grid(row=4, column=0, pady=10, padx=5)
 btn_agregar.grid(row=5, column=0, pady=10, padx=5)
 btn_visual.grid(row=4, column=1, pady=10, padx=5)
+
+
+
 
 # -------------------------------------------------------------
 # Ventana de salir
