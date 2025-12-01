@@ -224,13 +224,18 @@ labelprin = tk.Label(ventana, text="Transporte Urbano", bg="lightgrey", font=("A
 labelprin.grid(row=0, column=0, columnspan=2, pady=10)
 
 # Imagen
-imagen = Image.open(r"C:\Users\jcarl\OneDrive\Escritorio\proyecto final\logobus.png")
-imagen = imagen.resize((200, 200))
-imagen_tk = ImageTk.PhotoImage(imagen)
+try: #por si no encuentra la imagen
+    imagen = Image.open(r"logobus.png") #ruta de la imagen
+    imagen = imagen.resize((200, 200)) #redimensiona la imagen
+    imagen_tk = ImageTk.PhotoImage(imagen)#convierte la imagen para tkinter
 
-label_imagen = tk.Label(ventana, image=imagen_tk)
-label_imagen.image = imagen_tk
-label_imagen.grid(row=1, column=0, columnspan=2, pady=10)
+    label_imagen = tk.Label(ventana, image=imagen_tk)#pone la imagen en un label
+    label_imagen.image = imagen_tk #mantiene una referencia para que no se borre
+    label_imagen.grid(row=1, column=0, columnspan=2, pady=10) #coloca el label en la ventana
+except FileNotFoundError:# para evitar que se mate si no encuentra la imagen
+    print("Error: The file 'logobus.png' was not found. Please ensure the file is in the correct location.")#saca un error en consola, en ingles porque es un error tecnico
+    label_imagen = tk.Label(ventana, text="Imagen no disponible", font=("Arial", 12), bg="lightgrey")#pone un label de texto en vez de la imagen avisando que no se encontro
+    label_imagen.grid(row=1, column=0, columnspan=2, pady=10)#coloca el label en la ventana
 
 # Botones principales
 btn_estads = tk.Button(text="Estaditicas de Vehiculos", width=20, height=2, command=estats)
