@@ -186,6 +186,12 @@ def invempresas(nombre):
     )
     btn_volver.pack(pady=20)
 
+
+#####################################################################################3333
+##########################################################################################3
+#######################################################################################333
+
+
 def visualizacion_rutas():
     ventana.withdraw()  #esconde la ventana principal para que no se vea
 
@@ -263,7 +269,7 @@ def visualizacion_rutas():
         height=2,
         bg="#D9EAF7",
         state="disabled",
-        command=lambda: print(f"Lugar seleccionado: {dropdown_lugares.get()}, Terminal seleccionada: {dropdown_terminales.get()}")
+        command=lambda: abrir_ventana(dropdown_lugares.get(), dropdown_terminales.get())
     )
     btn_aceptar.grid(row=2, column=1, padx=10, pady=10)
 
@@ -272,9 +278,11 @@ def visualizacion_rutas():
         if option == "lugares":
             dropdown_lugares.config(state="readonly")
             dropdown_terminales.config(state="disabled")
+            dropdown_terminales.set("Seleccione un terminal...")  # limpia el dropdown de terminales
         elif option == "terminales":
             dropdown_terminales.config(state="readonly")
             dropdown_lugares.config(state="disabled")
+            dropdown_lugares.set("Seleccione un lugar...")  # limpia el dropdown de lugares
         btn_aceptar.config(state="disabled")
 
     #función para habilitar el botón aceptar cuando se selecciona una opción
@@ -285,6 +293,26 @@ def visualizacion_rutas():
     #vincula los menús desplegables con la función check_selection
     dropdown_lugares.bind("<<ComboboxSelected>>", check_selection)
     dropdown_terminales.bind("<<ComboboxSelected>>", check_selection)
+
+    #función para abrir una nueva ventana dependiendo de la selección
+    def abrir_ventana(lugar, terminal):
+        if lugar != "Seleccione un lugar...":
+            ventana_lugares = tk.Toplevel(ventana_visual)
+            ventana_lugares.title(f"Detalles del Lugar: {lugar}")
+            ventana_lugares.geometry("400x300")
+            tk.Label(ventana_lugares, text=f"Información sobre el lugar: {lugar}", font=("Arial", 14)).pack(pady=20)
+            tk.Button(ventana_lugares, text="Cerrar", command=ventana_lugares.destroy).pack(pady=10)
+        elif terminal != "Seleccione un terminal...":
+            ventana_terminales = tk.Toplevel(ventana_visual)
+            ventana_terminales.title(f"Detalles del Terminal: {terminal}")
+            ventana_terminales.geometry("400x300")
+            tk.Label(ventana_terminales, text=f"Información sobre el terminal: {terminal}", font=("Arial", 14)).pack(pady=20)
+            tk.Button(ventana_terminales, text="Cerrar", command=ventana_terminales.destroy).pack(pady=10)
+
+###################################################################################################33
+##############################################################################################################
+##########################################################################################
+
 
 # -------------------------------------------------------------------
 # ----- VENTANA DE SELECCION DE ESTADISTICAS ------------------------
