@@ -187,6 +187,36 @@ def invempresas(nombre):
     btn_volver.pack(pady=20)
 
 
+def filtrar_por_seleccion(lugar, terminal):
+    #restaura 'codigo' como columna normal
+    df_search = df_filtrado.reset_index().copy()
+
+    #si el usuario selecciona un lugar
+    if lugar and lugar != "Seleccione un lugar...":
+        def ruta_contiene(r):
+            if not isinstance(r, str):
+                return False
+            partes = [p.strip().lower() for p in r.split("-")]
+            return lugar.strip().lower() in partes
+
+        filtrado = df_search[df_search["ruta"].astype(str).apply(ruta_contiene)].copy()
+        lista_resultados = filtrado.to_dict(orient="records")
+        return lista_resultados
+
+    #si el usuario selecciona un terminal
+    elif terminal and terminal != "Seleccione un terminal...":
+        filtrado = df_search[
+            df_search["terminal"].astype(str).str.strip().str.lower()
+            == terminal.strip().lower()
+        ].copy()
+        lista_resultados = filtrado.to_dict(orient="records")
+        return lista_resultados
+
+    #si no hay selección válida
+    else:
+        return []
+
+
 #####################################################################################3333
 ##########################################################################################3
 #######################################################################################333
@@ -278,11 +308,9 @@ def visualizacion_rutas():
         if option == "lugares":
             dropdown_lugares.config(state="readonly")
             dropdown_terminales.config(state="disabled")
-            dropdown_terminales.set("Seleccione un terminal...")  # limpia el dropdown de terminales
         elif option == "terminales":
             dropdown_terminales.config(state="readonly")
             dropdown_lugares.config(state="disabled")
-            dropdown_lugares.set("Seleccione un lugar...")  # limpia el dropdown de lugares
         btn_aceptar.config(state="disabled")
 
     #función para habilitar el botón aceptar cuando se selecciona una opción
@@ -296,18 +324,41 @@ def visualizacion_rutas():
 
     #función para abrir una nueva ventana dependiendo de la selección
     def abrir_ventana(lugar, terminal):
-        if lugar != "Seleccione un lugar...":
-            ventana_lugares = tk.Toplevel(ventana_visual)
-            ventana_lugares.title(f"Detalles del Lugar: {lugar}")
-            ventana_lugares.geometry("400x300")
-            tk.Label(ventana_lugares, text=f"Información sobre el lugar: {lugar}", font=("Arial", 14)).pack(pady=20)
-            tk.Button(ventana_lugares, text="Cerrar", command=ventana_lugares.destroy).pack(pady=10)
-        elif terminal != "Seleccione un terminal...":
-            ventana_terminales = tk.Toplevel(ventana_visual)
-            ventana_terminales.title(f"Detalles del Terminal: {terminal}")
-            ventana_terminales.geometry("400x300")
-            tk.Label(ventana_terminales, text=f"Información sobre el terminal: {terminal}", font=("Arial", 14)).pack(pady=20)
-            tk.Button(ventana_terminales, text="Cerrar", command=ventana_terminales.destroy).pack(pady=10)
+        resultados = filtrar_por_seleccion(lugar, terminal)
+        if not resultados:
+            tk.messagebox.showinfo("Sin resultados", "No se encontraron filas para la selección.")
+            return
+
+        ventana_resultados = tk.Toplevel(ventana_visual)
+        ventana_resultados.title("Resultados")
+        ventana_resultados.geometry("900x400")
+        ventana_resultados.config(bg="white")
+
+        #frame para la tabla
+        frame_tabla = tk.Frame(ventana_resultados, bg="white")
+        frame_tabla.pack(fill="both", expand=True, padx=10, pady=10)
+
+        #columnas a mostrar (todas)
+        cols = list(resultados[0].keys())
+        tree = ttk.Treeview(frame_tabla, columns=cols, show="headings")
+        for c in cols:
+            tree.heading(c, text=c)
+            tree.column(c, width=120 if c in ["id", "codigo"] else 200, anchor="center" if c in ["id", "codigo"] else "w")
+        for row in resultados:
+            tree.insert("", "end", values=[row[c] for c in cols])
+
+        #scrollbars
+        vsb = ttk.Scrollbar(frame_tabla, orient="vertical", command=tree.yview)
+        hsb = ttk.Scrollbar(frame_tabla, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+        frame_tabla.grid_rowconfigure(0, weight=1)
+        frame_tabla.grid_columnconfigure(0, weight=1)
+
+        btn_cerrar = tk.Button(ventana_resultados, text="Cerrar", command=ventana_resultados.destroy)
+        btn_cerrar.pack(pady=8)
 
 ###################################################################################################33
 ##############################################################################################################
