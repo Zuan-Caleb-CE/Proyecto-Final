@@ -167,15 +167,15 @@ def invempresas(nombre):
     btn_volver.pack(pady=20)
 
 def visualizacion_rutas():
-    ventana.withdraw()  # Esconde la ventana principal para que no se vea
+    ventana.withdraw()  #esconde la ventana principal para que no se vea
 
-    # Crea la nueva ventana
+    #crea la nueva ventana
     ventana_visual = tk.Toplevel()
     ventana_visual.title("Visualización de Rutas")
     ventana_visual.geometry("600x400")
     ventana_visual.config(bg="white")
 
-    # Add content to the new window
+    #frame para el título
     frame_visual = tk.Frame(ventana_visual, bg="white")
     frame_visual.pack(pady=20)
 
@@ -188,83 +188,58 @@ def visualizacion_rutas():
     )
     label_visual.pack(pady=10)
 
-    # los menus desplegables
-    frame_dropdowns = tk.Frame(ventana_visual, bg="white")
-    frame_dropdowns.place(x=100, y=150)
+    #frame para botones y menús desplegables
+    frame_controls = tk.Frame(ventana_visual, bg="white")
+    frame_controls.pack(pady=20)
 
-    # Dropdown para Lugares
-    label_lugares = tk.Label(frame_dropdowns, text="Por Lugares", font=("Arial", 12), bg="white")
-    label_lugares.grid(row=0, column=0, padx=10, pady=5)
-
-    lugares = ["Lugar 1", "Lugar 2", "Lugar 3"]
-    dropdown_lugares = ttk.Combobox(frame_dropdowns, values=lugares, width=20, state="disabled")
-    dropdown_lugares.set("Seleccione un lugar...")
-    dropdown_lugares.grid(row=1, column=0, padx=10, pady=5)
-
-    # Dropdown for Terminales
-    label_terminales = tk.Label(frame_dropdowns, text="Por Terminales", font=("Arial", 12), bg="white")
-    label_terminales.grid(row=0, column=1, padx=10, pady=5)
-
-    terminales = ["Terminal 1", "Terminal 2", "Terminal 3"]
-    dropdown_terminales = ttk.Combobox(frame_dropdowns, values=terminales, width=20, state="disabled")
-    dropdown_terminales.set("Seleccione un terminal...")
-    dropdown_terminales.grid(row=1, column=1, padx=10, pady=5)
-
-    # Function to enable dropdowns
-    def enable_lugares():
-        dropdown_lugares.config(state="readonly")
-        dropdown_terminales.config(state="disabled")
-        btn_aceptar.config(state="disabled")
-
-    def enable_terminales():
-        dropdown_terminales.config(state="readonly")
-        dropdown_lugares.config(state="disabled")
-        btn_aceptar.config(state="disabled")
-
-    # Function to enable the "Aceptar" button when a dropdown option is selected
-    def check_selection(event=None):
-        if dropdown_lugares.get() != "Seleccione un lugar..." or dropdown_terminales.get() != "Seleccione un terminal...":
-            btn_aceptar.config(state="normal")
-
-    # Bind the dropdowns to the check_selection function
-    dropdown_lugares.bind("<<ComboboxSelected>>", check_selection)
-    dropdown_terminales.bind("<<ComboboxSelected>>", check_selection)
-
-    # Buttons to enable dropdowns
+    #botón para activar el menú desplegable de lugares
     btn_lugares = tk.Button(
-        ventana_visual,
+        frame_controls,
         text="Por Lugares",
         width=20,
         height=2,
         bg="#D9EAF7",
-        command=enable_lugares
+        command=lambda: enable_dropdown("lugares")
     )
-    btn_lugares.place(x=100, y=100)
+    btn_lugares.grid(row=0, column=0, padx=10, pady=5)
 
+    #menú desplegable de lugares
+    lugares = ["Lugar 1", "Lugar 2", "Lugar 3"]
+    dropdown_lugares = ttk.Combobox(frame_controls, values=lugares, width=20, state="disabled")
+    dropdown_lugares.set("Seleccione un lugar...")
+    dropdown_lugares.grid(row=1, column=0, padx=10, pady=5)
+
+    #botón para activar el menú desplegable de terminales
     btn_terminales = tk.Button(
-        ventana_visual,
+        frame_controls,
         text="Por Terminales",
         width=20,
         height=2,
         bg="#D9EAF7",
-        command=enable_terminales
+        command=lambda: enable_dropdown("terminales")
     )
-    btn_terminales.place(x=300, y=100)
+    btn_terminales.grid(row=0, column=1, padx=10, pady=5)
 
-    # Botón para regresar
+    #menú desplegable de terminales
+    terminales = ["Terminal 1", "Terminal 2", "Terminal 3"]
+    dropdown_terminales = ttk.Combobox(frame_controls, values=terminales, width=20, state="disabled")
+    dropdown_terminales.set("Seleccione un terminal...")
+    dropdown_terminales.grid(row=1, column=1, padx=10, pady=5)
+
+    #botón para regresar
     btn_volver = tk.Button(
-        ventana_visual,
+        frame_controls,
         text="Regresa",
         width=20,
         height=2,
         bg="#D9EAF7",
         command=lambda: cerrar_y_volver(ventana_visual)
     )
-    btn_volver.place(x=150, y=300)
+    btn_volver.grid(row=2, column=0, padx=10, pady=10)
 
-    # Botón aceptar (initially disabled)
+    #botón aceptar (inicialmente deshabilitado)
     btn_aceptar = tk.Button(
-        ventana_visual,
+        frame_controls,
         text="Aceptar",
         width=20,
         height=2,
@@ -272,7 +247,26 @@ def visualizacion_rutas():
         state="disabled",
         command=lambda: print("Aceptar button pressed")
     )
-    btn_aceptar.place(x=350, y=300)
+    btn_aceptar.grid(row=2, column=1, padx=10, pady=10)
+
+    #función para habilitar los menús desplegables
+    def enable_dropdown(option):
+        if option == "lugares":
+            dropdown_lugares.config(state="readonly")
+            dropdown_terminales.config(state="disabled")
+        elif option == "terminales":
+            dropdown_terminales.config(state="readonly")
+            dropdown_lugares.config(state="disabled")
+        btn_aceptar.config(state="disabled")
+
+    #función para habilitar el botón aceptar cuando se selecciona una opción
+    def check_selection(event=None):
+        if dropdown_lugares.get() != "Seleccione un lugar..." or dropdown_terminales.get() != "Seleccione un terminal...":
+            btn_aceptar.config(state="normal")
+
+    #vincula los menús desplegables con la función check_selection
+    dropdown_lugares.bind("<<ComboboxSelected>>", check_selection)
+    dropdown_terminales.bind("<<ComboboxSelected>>", check_selection)
 
 # -------------------------------------------------------------------
 # ----- VENTANA DE SELECCION DE ESTADISTICAS ------------------------
