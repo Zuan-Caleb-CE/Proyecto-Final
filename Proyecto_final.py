@@ -24,6 +24,14 @@ print(df_filtrado.describe())
 
 print(df_filtrado)
 
+#extrae las columnas necesarias del DataFrame
+lugares = df["ruta"].dropna().unique().tolist()  #elimina valores nulos y convierte a lista
+terminales = df["terminal"].dropna().unique().tolist()  #elimina valores nulos y convierte a lista
+
+#ordena las listas alfabéticamente
+lugares.sort()
+terminales.sort()
+
 
 #añadido de metadatos
 if 'id' not in df.columns:
@@ -204,7 +212,6 @@ def visualizacion_rutas():
     btn_lugares.grid(row=0, column=0, padx=10, pady=5)
 
     #menú desplegable de lugares
-    lugares = ["Lugar 1", "Lugar 2", "Lugar 3"]
     dropdown_lugares = ttk.Combobox(frame_controls, values=lugares, width=20, state="disabled")
     dropdown_lugares.set("Seleccione un lugar...")
     dropdown_lugares.grid(row=1, column=0, padx=10, pady=5)
@@ -221,7 +228,6 @@ def visualizacion_rutas():
     btn_terminales.grid(row=0, column=1, padx=10, pady=5)
 
     #menú desplegable de terminales
-    terminales = ["Terminal 1", "Terminal 2", "Terminal 3"]
     dropdown_terminales = ttk.Combobox(frame_controls, values=terminales, width=20, state="disabled")
     dropdown_terminales.set("Seleccione un terminal...")
     dropdown_terminales.grid(row=1, column=1, padx=10, pady=5)
@@ -245,7 +251,7 @@ def visualizacion_rutas():
         height=2,
         bg="#D9EAF7",
         state="disabled",
-        command=lambda: print("Aceptar button pressed")
+        command=lambda: print(f"Lugar seleccionado: {dropdown_lugares.get()}, Terminal seleccionada: {dropdown_terminales.get()}")
     )
     btn_aceptar.grid(row=2, column=1, padx=10, pady=10)
 
