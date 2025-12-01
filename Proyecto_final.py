@@ -26,12 +26,24 @@ print(df_filtrado)
 
 #extrae las columnas necesarias del DataFrame
 lugares = df["ruta"].dropna().unique().tolist()  #elimina valores nulos y convierte a lista
-terminales = df["terminal"].dropna().unique().tolist()  #elimina valores nulos y convierte a lista
 
-#ordena las listas alfabéticamente
-lugares.sort()
+#separa las rutas por el carácter "-" y extrae los lugares únicos
+lugares_separados = set()  #usa un conjunto para evitar duplicados
+for ruta in lugares:
+    lugares_separados.update([lugar.strip() for lugar in ruta.split("-")])  #separa y elimina espacios
+
+lugares = sorted(lugares_separados)  #convierte el conjunto a una lista y la ordena alfabéticamente
+
+#extrae y ordena las terminales
+terminales = df["terminal"].dropna().unique().tolist()  #elimina valores nulos y convierte a lista
 terminales.sort()
 
+#imprime las listas
+print("Lugares:")
+print(lugares)
+
+print("\nTerminales:")
+print(terminales)
 
 #añadido de metadatos
 if 'id' not in df.columns:
@@ -712,7 +724,7 @@ for c in (pico, valle):
 #       DataFrame                    media y desviación estándar
 stats_general = DF[[pico, valle]].agg(['count', 'mean', 'std'])\
 .T.rename(columns={'count':'cantidad','mean':'promedio','std':'desviacion'})
-#transpone la tabla para que     renombra las columnas del resultado 
+#transpone la tabla para que     renombre las columnas del resultado 
 #las filas sean pico y valle             a nombres en español 
  #(más legible).                   cantidad, promedio, desviacion
 
