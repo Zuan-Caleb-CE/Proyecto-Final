@@ -166,6 +166,30 @@ def invempresas(nombre):
     )
     btn_volver.pack(pady=20)
 
+def visualizacion_rutas():
+    # Close the main window
+    ventana.withdraw()
+
+    # Create a new window
+    ventana_visual = tk.Toplevel()
+    ventana_visual.title("Visualización de Rutas")
+    ventana_visual.geometry("600x400")
+    ventana_visual.config(bg="white")
+
+    # Add content to the new window
+    label_visual = tk.Label(ventana_visual, text="Visualización de Rutas", font=("Arial", 16), bg="white")
+    label_visual.pack(pady=20)
+
+    # Button to go back to the main window
+    btn_volver = tk.Button(
+        ventana_visual,
+        text="Volver al menú principal",
+        width=20,
+        height=2,
+        command=lambda: cerrar_y_volver(ventana_visual)
+    )
+    btn_volver.pack(pady=20)
+
 # -------------------------------------------------------------------
 # ----- VENTANA DE SELECCION DE ESTADISTICAS ------------------------
 # -------------------------------------------------------------------
@@ -240,7 +264,7 @@ except FileNotFoundError:# para evitar que se mate si no encuentra la imagen
 # Botones principales
 btn_estads = tk.Button(text="Estaditicas de Vehiculos", width=20, height=2, command=estats)
 btn_agregar = tk.Button(text="Agregar vehiculo", width=20, height=2, command=a)
-btn_visual = tk.Button(text="Visualización de rutas", width=20, height=2, command=a)
+btn_visual = tk.Button(text="Visualización de rutas", width=20, height=2, command=visualizacion_rutas)
 
 btn_estads.grid(row=4, column=0, pady=10, padx=5)
 btn_agregar.grid(row=5, column=0, pady=10, padx=5)
