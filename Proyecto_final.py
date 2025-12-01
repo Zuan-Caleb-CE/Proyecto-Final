@@ -167,7 +167,7 @@ def invempresas(nombre):
     btn_volver.pack(pady=20)
 
 def visualizacion_rutas():
-    ventana.withdraw() #esconde la ventana principal para que no se vea
+    ventana.withdraw()  # Esconde la ventana principal para que no se vea
 
     # Crea la nueva ventana
     ventana_visual = tk.Toplevel()
@@ -176,18 +176,38 @@ def visualizacion_rutas():
     ventana_visual.config(bg="white")
 
     # Add content to the new window
-    label_visual = tk.Label(ventana_visual, text="seleccione una de las dos opciones", font=("Arial", 16), bg="white")
-    label_visual.pack(pady=20)
+    frame_visual = tk.Frame(ventana_visual, bg="white")  # Frame for aesthetics
+    frame_visual.pack(pady=20)
 
-    # Button to go back to the main window
+    label_visual = tk.Label(
+        frame_visual,
+        text="Seleccione una de las dos opciones",
+        font=("Arial", 16),
+        bg="white",
+        justify="center"
+    )
+    label_visual.pack(pady=10)
+
+    # Buttons
     btn_volver = tk.Button(
         ventana_visual,
-        text="regresa",
+        text="Regresa",
         width=20,
         height=2,
+        bg="#D9EAF7",
         command=lambda: cerrar_y_volver(ventana_visual)
     )
-    btn_volver.pack(pady=20)
+    btn_volver.place(x=150, y=300)  # Positioned more to the left
+
+    btn_aceptar = tk.Button(
+        ventana_visual,
+        text="Aceptar",
+        width=20,
+        height=2,
+        bg="#D9EAF7",
+        command=lambda: print("Aceptar button pressed")  # Placeholder for future functionality
+    )
+    btn_aceptar.place(x=350, y=300)  # Positioned to the right
 
 # -------------------------------------------------------------------
 # ----- VENTANA DE SELECCION DE ESTADISTICAS ------------------------
