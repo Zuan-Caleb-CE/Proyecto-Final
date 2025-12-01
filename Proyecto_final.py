@@ -5,6 +5,8 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import re
+import unicodedata
 
 df = pd.read_csv("8._RUTAS_TRANSPORTE_URBANO_20251011.csv", index_col="codigo")
 print(df.columns)
@@ -18,7 +20,7 @@ df_filtrado = df.fillna({"empresa":"BUSETAS AUTONOMA"
 
 df_filtrado["empresa_limpia"] = df_filtrado["empresa"].str.replace("OPERACIÓN AUTORIZADA A ", "", regex=False)
 
-df_filtrado = df_filtrado.dropna()
+df_filtrado = df_filtrado.dropna(subset=['ruta','terminal'], how='all')
 
 print(df_filtrado.describe())
 
@@ -35,7 +37,7 @@ for ruta in lugares:
 lugares = sorted(lugares_separados)  #convierte el conjunto a una lista y la ordena alfabéticamente
 
 #extrae y ordena las terminales
-terminales = df["terminal"].dropna().unique().tolist()  #elimina valores nulos y convierte a lista
+terminales = sorted(set(df["terminal"].dropna().astype(str).str.strip()))  #elimina valores nulos y convierte a lista
 terminales.sort()
 
 #imprime las listas
@@ -188,10 +190,8 @@ def invempresas(nombre):
 
 
 def filtrar_por_seleccion(lugar, terminal):
-    #restaura 'codigo' como columna normal
     df_search = df_filtrado.reset_index().copy()
 
-    #si el usuario selecciona un lugar
     if lugar and lugar != "Seleccione un lugar...":
         def ruta_contiene(r):
             if not isinstance(r, str):
@@ -203,18 +203,47 @@ def filtrar_por_seleccion(lugar, terminal):
         lista_resultados = filtrado.to_dict(orient="records")
         return lista_resultados
 
-    #si el usuario selecciona un terminal
     elif terminal and terminal != "Seleccione un terminal...":
+        terminal_normalizado = terminal.strip().lower()
         filtrado = df_search[
-            df_search["terminal"].astype(str).str.strip().str.lower()
-            == terminal.strip().lower()
+            df_search["terminal"].astype(str).str.strip().str.lower() == terminal_normalizado
         ].copy()
+        print("DEBUG: terminales encontrados en el filtrado:")
+        for t in filtrado["terminal"]:
+            print(f"  '{t}'")
         lista_resultados = filtrado.to_dict(orient="records")
         return lista_resultados
 
-    #si no hay selección válida
     else:
         return []
+"""ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
+"""ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
+"""ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
+def debug_lugares_terminales_vacios():
+    print("\n--- DEBUG: Lugares vacíos tras filtrar ---")
+    vacios_lugares = []
+    for lugar in lugares:
+        res = filtrar_por_seleccion(lugar, None)
+        if not res:
+            print(f"lugar vacío: '{lugar}'")
+            vacios_lugares.append(lugar)
+    print(f"Total lugares vacíos: {len(vacios_lugares)}")
+
+    print("\n--- DEBUG: Terminales vacíos tras filtrar ---")
+    vacios_terminales = []
+    for terminal in terminales:
+        res = filtrar_por_seleccion(None, terminal)
+        if not res:
+            print(f"terminal vacío: '{terminal}'")
+            vacios_terminales.append(terminal)
+    print(f"Total terminales vacíos: {len(vacios_terminales)}")
+    print("--- FIN DEBUG ---\n")
+
+debug_lugares_terminales_vacios()
+
+"""ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
+"""ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
+"""ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
 
 
 #####################################################################################3333
@@ -303,20 +332,31 @@ def visualizacion_rutas():
     )
     btn_aceptar.grid(row=2, column=1, padx=10, pady=10)
 
+    #variable para saber qué modo está activo
+    modo_seleccion = {"tipo": None}
+
     #función para habilitar los menús desplegables
     def enable_dropdown(option):
         if option == "lugares":
+            modo_seleccion["tipo"] = "lugares"
             dropdown_lugares.config(state="readonly")
             dropdown_terminales.config(state="disabled")
+            dropdown_terminales.set("Seleccione un terminal...")  # limpia terminales
         elif option == "terminales":
+            modo_seleccion["tipo"] = "terminales"
             dropdown_terminales.config(state="readonly")
             dropdown_lugares.config(state="disabled")
+            dropdown_lugares.set("Seleccione un lugar...")  # limpia lugares
         btn_aceptar.config(state="disabled")
 
-    #función para habilitar el botón aceptar cuando se selecciona una opción
+    #función para habilitar el botón aceptar solo si el campo activo tiene selección válida
     def check_selection(event=None):
-        if dropdown_lugares.get() != "Seleccione un lugar..." or dropdown_terminales.get() != "Seleccione un terminal...":
+        if modo_seleccion["tipo"] == "lugares" and dropdown_lugares.get() != "Seleccione un lugar...":
             btn_aceptar.config(state="normal")
+        elif modo_seleccion["tipo"] == "terminales" and dropdown_terminales.get() != "Seleccione un terminal...":
+            btn_aceptar.config(state="normal")
+        else:
+            btn_aceptar.config(state="disabled")
 
     #vincula los menús desplegables con la función check_selection
     dropdown_lugares.bind("<<ComboboxSelected>>", check_selection)
@@ -324,38 +364,64 @@ def visualizacion_rutas():
 
     #función para abrir una nueva ventana dependiendo de la selección
     def abrir_ventana(lugar, terminal):
-        resultados = filtrar_por_seleccion(lugar, terminal)
+        print(f"DEBUG: usuario eligió lugar='{lugar}' terminal='{terminal}' modo={modo_seleccion['tipo']}")
+        if modo_seleccion["tipo"] == "lugares":
+            resultados = filtrar_por_seleccion(lugar, None)
+            seleccion = lugar
+            tipo = "lugar"
+        elif modo_seleccion["tipo"] == "terminales":
+            resultados = filtrar_por_seleccion(None, terminal)
+            seleccion = terminal
+            tipo = "terminal"
+        else:
+            print("error: modo de selección no definido")
+            tk.messagebox.showinfo("Sin resultados", "Seleccione un modo de búsqueda.")
+            return
+
         if not resultados:
-            tk.messagebox.showinfo("Sin resultados", "No se encontraron filas para la selección.")
+            print(f"error: {tipo} '{seleccion}' no tiene resultados")
+            tk.messagebox.showinfo("Sin resultados", f"No se encontraron filas para la selección: {seleccion}")
             return
 
         ventana_resultados = tk.Toplevel(ventana_visual)
         ventana_resultados.title("Resultados")
-        ventana_resultados.geometry("900x400")
+        ventana_resultados.geometry("700x400")
         ventana_resultados.config(bg="white")
 
-        #frame para la tabla
-        frame_tabla = tk.Frame(ventana_resultados, bg="white")
-        frame_tabla.pack(fill="both", expand=True, padx=10, pady=10)
+        #frame con scrollbar si hay muchos resultados
+        frame_canvas = tk.Frame(ventana_resultados, bg="white")
+        frame_canvas.pack(fill="both", expand=True)
+        canvas = tk.Canvas(frame_canvas, bg="white")
+        scrollbar = tk.Scrollbar(frame_canvas, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        frame_labels = tk.Frame(canvas, bg="white")
+        canvas.create_window((0, 0), window=frame_labels, anchor="nw")
 
-        #columnas a mostrar (todas)
-        cols = list(resultados[0].keys())
-        tree = ttk.Treeview(frame_tabla, columns=cols, show="headings")
-        for c in cols:
-            tree.heading(c, text=c)
-            tree.column(c, width=120 if c in ["id", "codigo"] else 200, anchor="center" if c in ["id", "codigo"] else "w")
-        for row in resultados:
-            tree.insert("", "end", values=[row[c] for c in cols])
+        def actualizar_scroll(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        frame_labels.bind("<Configure>", actualizar_scroll)
 
-        #scrollbars
-        vsb = ttk.Scrollbar(frame_tabla, orient="vertical", command=tree.yview)
-        hsb = ttk.Scrollbar(frame_tabla, orient="horizontal", command=tree.xview)
-        tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-        tree.grid(row=0, column=0, sticky="nsew")
-        vsb.grid(row=0, column=1, sticky="ns")
-        hsb.grid(row=1, column=0, sticky="ew")
-        frame_tabla.grid_rowconfigure(0, weight=1)
-        frame_tabla.grid_columnconfigure(0, weight=1)
+        #muestra cada id y recorrido en un label separado
+        for idx, row in enumerate(resultados):
+            bus_id = str(row.get("id", row.get("codigo", "")))
+            recorrido = str(row.get("recorrido", ""))
+            #debug: si alguno está vacío, lo reporta
+            if not bus_id or not recorrido:
+                print(f"error: id vacío='{bus_id}' recorrido vacío='{recorrido}' para selección lugar='{lugar}' terminal='{terminal}'")
+            label = tk.Label(
+                frame_labels,
+                text=f"ID: {bus_id}\nRecorrido: {recorrido}",
+                font=("Arial", 11),
+                bg="white",
+                anchor="w",
+                justify="left",
+                relief="groove",
+                borderwidth=1,
+                padx=6, pady=4
+            )
+            label.pack(fill="x", pady=3, padx=3)
 
         btn_cerrar = tk.Button(ventana_resultados, text="Cerrar", command=ventana_resultados.destroy)
         btn_cerrar.pack(pady=8)
