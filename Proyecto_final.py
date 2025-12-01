@@ -176,7 +176,7 @@ def visualizacion_rutas():
     ventana_visual.config(bg="white")
 
     # Add content to the new window
-    frame_visual = tk.Frame(ventana_visual, bg="white")  # Frame for aesthetics
+    frame_visual = tk.Frame(ventana_visual, bg="white")  # intente poner un frame para centrar mejor, no veo la diferencia y me da susto quitarlo
     frame_visual.pack(pady=20)
 
     label_visual = tk.Label(
@@ -187,6 +187,28 @@ def visualizacion_rutas():
         justify="center"
     )
     label_visual.pack(pady=10)
+
+    # los menus desplegables
+    frame_dropdowns = tk.Frame(ventana_visual, bg="white")  # Frame para los dropdowns, los queremos uno al lado del otro
+    frame_dropdowns.place(x=100, y=150)  # Posiciona el frame en la ventana
+
+    # Dropdown para Lugares
+    label_lugares = tk.Label(frame_dropdowns, text="Lugares", font=("Arial", 12), bg="white")
+    label_lugares.grid(row=0, column=0, padx=10, pady=5)
+
+    lugares = ["Lugar 1", "Lugar 2", "Lugar 3"]  # Example options
+    dropdown_lugares = ttk.Combobox(frame_dropdowns, values=lugares, width=20, state="readonly")
+    dropdown_lugares.set("Seleccione un lugar...")
+    dropdown_lugares.grid(row=1, column=0, padx=10, pady=5)
+
+    # Dropdown for Terminales
+    label_terminales = tk.Label(frame_dropdowns, text="Terminales", font=("Arial", 12), bg="white")
+    label_terminales.grid(row=0, column=1, padx=10, pady=5)
+
+    terminales = ["Terminal 1", "Terminal 2", "Terminal 3"]  # Example options
+    dropdown_terminales = ttk.Combobox(frame_dropdowns, values=terminales, width=20, state="readonly")
+    dropdown_terminales.set("Seleccione un terminal...")
+    dropdown_terminales.grid(row=1, column=1, padx=10, pady=5)
 
     # Buttons
     btn_volver = tk.Button(
