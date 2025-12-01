@@ -176,7 +176,7 @@ def visualizacion_rutas():
     ventana_visual.config(bg="white")
 
     # Add content to the new window
-    frame_visual = tk.Frame(ventana_visual, bg="white")  # intente poner un frame para centrar mejor, no veo la diferencia y me da susto quitarlo
+    frame_visual = tk.Frame(ventana_visual, bg="white")
     frame_visual.pack(pady=20)
 
     label_visual = tk.Label(
@@ -189,28 +189,69 @@ def visualizacion_rutas():
     label_visual.pack(pady=10)
 
     # los menus desplegables
-    frame_dropdowns = tk.Frame(ventana_visual, bg="white")  # Frame para los dropdowns, los queremos uno al lado del otro
-    frame_dropdowns.place(x=100, y=150)  # Posiciona el frame en la ventana
+    frame_dropdowns = tk.Frame(ventana_visual, bg="white")
+    frame_dropdowns.place(x=100, y=150)
 
     # Dropdown para Lugares
-    label_lugares = tk.Label(frame_dropdowns, text="Lugares", font=("Arial", 12), bg="white")
+    label_lugares = tk.Label(frame_dropdowns, text="Por Lugares", font=("Arial", 12), bg="white")
     label_lugares.grid(row=0, column=0, padx=10, pady=5)
 
-    lugares = ["Lugar 1", "Lugar 2", "Lugar 3"]  # Example options
-    dropdown_lugares = ttk.Combobox(frame_dropdowns, values=lugares, width=20, state="readonly")
+    lugares = ["Lugar 1", "Lugar 2", "Lugar 3"]
+    dropdown_lugares = ttk.Combobox(frame_dropdowns, values=lugares, width=20, state="disabled")
     dropdown_lugares.set("Seleccione un lugar...")
     dropdown_lugares.grid(row=1, column=0, padx=10, pady=5)
 
     # Dropdown for Terminales
-    label_terminales = tk.Label(frame_dropdowns, text="Terminales", font=("Arial", 12), bg="white")
+    label_terminales = tk.Label(frame_dropdowns, text="Por Terminales", font=("Arial", 12), bg="white")
     label_terminales.grid(row=0, column=1, padx=10, pady=5)
 
-    terminales = ["Terminal 1", "Terminal 2", "Terminal 3"]  # Example options
-    dropdown_terminales = ttk.Combobox(frame_dropdowns, values=terminales, width=20, state="readonly")
+    terminales = ["Terminal 1", "Terminal 2", "Terminal 3"]
+    dropdown_terminales = ttk.Combobox(frame_dropdowns, values=terminales, width=20, state="disabled")
     dropdown_terminales.set("Seleccione un terminal...")
     dropdown_terminales.grid(row=1, column=1, padx=10, pady=5)
 
-    # Buttons
+    # Function to enable dropdowns
+    def enable_lugares():
+        dropdown_lugares.config(state="readonly")
+        dropdown_terminales.config(state="disabled")
+        btn_aceptar.config(state="disabled")
+
+    def enable_terminales():
+        dropdown_terminales.config(state="readonly")
+        dropdown_lugares.config(state="disabled")
+        btn_aceptar.config(state="disabled")
+
+    # Function to enable the "Aceptar" button when a dropdown option is selected
+    def check_selection(event=None):
+        if dropdown_lugares.get() != "Seleccione un lugar..." or dropdown_terminales.get() != "Seleccione un terminal...":
+            btn_aceptar.config(state="normal")
+
+    # Bind the dropdowns to the check_selection function
+    dropdown_lugares.bind("<<ComboboxSelected>>", check_selection)
+    dropdown_terminales.bind("<<ComboboxSelected>>", check_selection)
+
+    # Buttons to enable dropdowns
+    btn_lugares = tk.Button(
+        ventana_visual,
+        text="Por Lugares",
+        width=20,
+        height=2,
+        bg="#D9EAF7",
+        command=enable_lugares
+    )
+    btn_lugares.place(x=100, y=100)
+
+    btn_terminales = tk.Button(
+        ventana_visual,
+        text="Por Terminales",
+        width=20,
+        height=2,
+        bg="#D9EAF7",
+        command=enable_terminales
+    )
+    btn_terminales.place(x=300, y=100)
+
+    # Botón para regresar
     btn_volver = tk.Button(
         ventana_visual,
         text="Regresa",
@@ -219,17 +260,19 @@ def visualizacion_rutas():
         bg="#D9EAF7",
         command=lambda: cerrar_y_volver(ventana_visual)
     )
-    btn_volver.place(x=150, y=300)  # Positioned more to the left
+    btn_volver.place(x=150, y=300)
 
+    # Botón aceptar (initially disabled)
     btn_aceptar = tk.Button(
         ventana_visual,
         text="Aceptar",
         width=20,
         height=2,
         bg="#D9EAF7",
-        command=lambda: print("Aceptar button pressed")  # Placeholder for future functionality
+        state="disabled",
+        command=lambda: print("Aceptar button pressed")
     )
-    btn_aceptar.place(x=350, y=300)  # Positioned to the right
+    btn_aceptar.place(x=350, y=300)
 
 # -------------------------------------------------------------------
 # ----- VENTANA DE SELECCION DE ESTADISTICAS ------------------------
