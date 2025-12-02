@@ -161,7 +161,7 @@ def invempresas(nombre):
     except Exception as e:
         print("debug: error cerrando toplevels previos:", e)
 
-    #verificar nombre válido
+    #si el nombre es el placeholder o vacío, avisar y no continuar
     if not nombre or nombre.strip() == "" or "Seleccione" in nombre:
         try:
             tk.messagebox.showinfo("Información", "Seleccione una empresa válida antes de ver.")
@@ -169,11 +169,14 @@ def invempresas(nombre):
             pass
         return
 
+    #normalizar nombre buscado (case-insensitive)
     nombre_buscar = nombre.strip().lower()
 
-    #filtrado seguro
+    #filtrar de forma segura usando igualdad primero luego contains
     try:
-        df_emp = df_filtrado[df_filtrado["empresa_limpia"].astype(str).str.strip().str.lower() == nombre_buscar].copy()
+        df_emp = df_filtrado[
+            df_filtrado["empresa_limpia"].astype(str).str.strip().str.lower() == nombre_buscar
+        ].copy()
     except Exception as e:
         print("debug: error filtrando empresa:", e)
         try:
@@ -184,7 +187,11 @@ def invempresas(nombre):
 
     if df_emp.empty:
         try:
-            df_emp = df_filtrado[df_filtrado["empresa_limpia"].astype(str).str.strip().str.lower().str.contains(re.escape(nombre_buscar))].copy()
+            df_emp = df_filtrado[
+                df_filtrado["empresa_limpia"].astype(str).str.strip().str.lower().str.contains(
+                    re.escape(nombre_buscar)
+                )
+            ].copy()
         except Exception as e:
             print("debug: error secundario filtrando por contains:", e)
             df_emp = pd.DataFrame()
@@ -196,16 +203,16 @@ def invempresas(nombre):
             pass
         return
 
-    #crear ventana principal
+    #crear ventana nueva para mostrar estadísticas (tamaño similar al original)
     ven_emp = tk.Toplevel(ventana)
     ven_emp.title(f"Estadísticas — {nombre}")
-    ven_emp.geometry("1000x800")
+    ven_emp.geometry("750x700")
     ven_emp.config(bg="#F5F5F5")
     ven_emp.transient(ventana)
     ven_emp.grab_set()
 
-    #header fijo superior
-    marco_header = ttk.Frame(ven_emp, padding=(10,6))
+    #header fijo superior con título y botón volver (siempre visible)
+    marco_header = ttk.Frame(ven_emp, padding=(8,6))
     marco_header.pack(side="top", fill="x")
 
     etiqueta_titulo = ttk.Label(marco_header, text=f"Empresa: {nombre}", font=("Arial", 16, "bold"))
@@ -215,14 +222,14 @@ def invempresas(nombre):
         marco_header,
         text="Volver al menú principal",
         font=("Arial", 11),
-        width=22,
+        width=20,
         height=1,
         bg="#D9EAF7",
         command=lambda: cerrar_y_volver(ven_emp)
     )
     btn_volver_header.pack(side="right", padx=(0,10))
 
-    #área scrollable para gráficos y texto
+    #scrollable canvas para contenido (gráfica + resumen)
     contenedor = tk.Frame(ven_emp)
     contenedor.pack(fill="both", expand=True)
 
@@ -240,211 +247,69 @@ def invempresas(nombre):
         canvas.configure(scrollregion=canvas.bbox("all"))
     frame_scroll.bind("<Configure>", actualizar_scroll)
 
-    #función auxiliar para convertir columnas numéricas
-    def convertir_numericas_seguras(df_local, candidatos):
-        for c in candidatos:
-            if c in df_local.columns:
-                df_local[c] = (df_local[c].astype(str)
-                               .str.replace(",", ".", regex=False)
-                               .str.extract(r"([-+]?\d*\.?\d+)")[0])
-                df_local[c] = pd.to_numeric(df_local[c], errors="coerce")
-        return df_local
+    #asegurar columnas numéricas convertidas de forma segura
+    for col in ("capacidad_maxima", "capacidad_minima", "frecuencia_de_despacho_hora_pico", "frecuencia_despacho_hora_valle"):
+        if col in df_emp.columns:
+            try:
+                df_emp[col] = df_emp[col].astype(str).str.replace(",", ".", regex=False)
+                df_emp[col] = pd.to_numeric(df_emp[col].str.extract(r"([-+]?\d*\.?\d+)")[0], errors="coerce")
+            except Exception:
+                df_emp[col] = pd.to_numeric(df_emp[col], errors="coerce")
 
-    #convertir numéricas
-    candidatos_num = [
-        "capacidad_maxima", "capacidad_minima",
-        "frecuencia_de_despacho_hora_pico", "frecuencia_de_despacho_pico", "frecuencia_pico",
-        "frecuencia_despacho_hora_valle", "frecuencia_de_despacho_hora_valle", "frecuencia_valle",
-        "frecuencia_despacho_hora_valle"
-    ]
-    df_emp = convertir_numericas_seguras(df_emp, candidatos_num)
-
-    posibles_long = ["long_km", "longitud", "longitud_km", "long_km"]
-    df_emp = convertir_numericas_seguras(df_emp, posibles_long)
-
-    #marco rejilla 2x2
-    marco_graficos = ttk.Frame(frame_scroll)
-    marco_graficos.pack(padx=10, pady=8, fill="both", expand=False)
-
-    marco_graficos.columnconfigure(0, weight=1)
-    marco_graficos.columnconfigure(1, weight=1)
-    marco_graficos.rowconfigure(0, weight=1)
-    marco_graficos.rowconfigure(1, weight=1)
-
-    #función para dibujar figuras
-    def render_fig_en_frame(fig, parent_frame):
-        try:
-            canvas_fig = FigureCanvasTkAgg(fig, master=parent_frame)
-            canvas_fig.draw()
-            widget = canvas_fig.get_tk_widget()
-            widget.pack(fill="both", expand=True)
-        except Exception as e:
-            print("debug: error renderizando figura en frame:", e)
-
-    #--------- GRAFICO A: terminales (0,0) ----------
+    #intentar crear la gráfica de terminales dentro de try para capturar errores
     try:
-        frame_a = ttk.Frame(marco_graficos, padding=6)
-        frame_a.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+        frame_graf = tk.Frame(frame_scroll, bg="#F5F5F5")
+        frame_graf.pack(pady=10, fill="both", expand=False)
 
         if "terminal" in df_emp.columns and not df_emp["terminal"].dropna().empty:
             conteo_term = df_emp["terminal"].value_counts()
-            fig_a, ax_a = plt.subplots(figsize=(3.5, 3), dpi=100)
-            conteo_term.plot(kind="bar", ax=ax_a)
-            ax_a.set_title("Frecuencia de terminales", fontsize=9)
-            ax_a.set_xlabel("")
-            ax_a.set_ylabel("Cantidad")
-            plt.setp(ax_a.get_xticklabels(), rotation=35, ha="right", fontsize=7)
-            ax_a.grid(alpha=0.25)
-            fig_a.tight_layout()
-            render_fig_en_frame(fig_a, frame_a)
+            fig, ax = plt.subplots(figsize=(7, 4), dpi=100)
+            conteo_term.plot(kind="bar", ax=ax)
+            ax.set_title(f"Frecuencia de terminales — {nombre}", fontsize=10)
+            ax.set_xlabel("Terminal")
+            ax.set_ylabel("Cantidad")
+            plt.xticks(rotation=45, ha="right")
+            plt.tight_layout()
+            ax.grid(alpha=0.3)
+
+            canvas_graf = FigureCanvasTkAgg(fig, master=frame_graf)
+            canvas_graf.draw()
+            canvas_graf.get_tk_widget().pack(fill="both", expand=True)
         else:
-            ttk.Label(frame_a, text="sin datos de terminales", background="#F5F5F5").pack(expand=True, fill="both")
+            ttk.Label(frame_graf, text="sin datos de terminales", background="#F5F5F5").pack(fill="both", expand=True)
     except Exception as e:
-        print("debug: error grafico terminales:", e)
+        print("debug: error creando grafica terminales:", e)
+        try:
+            tk.messagebox.showwarning("Advertencia", f"No se pudo generar la gráfica: {e}")
+        except:
+            pass
 
-    #--------- GRAFICO B: scatter (0,1) ----------
-    try:
-        frame_b = ttk.Frame(marco_graficos, padding=6)
-        frame_b.grid(row=0, column=1, sticky="nsew", padx=6, pady=6)
-
-        num_cols = df_emp.select_dtypes(include=[np.number]).columns.tolist()
-        num_cols = [c for c in num_cols if c not in ("id",)]
-
-        if len(num_cols) >= 2:
-            conteos = {c: df_emp[c].count() for c in num_cols}
-            cols_orden = sorted(conteos, key=lambda k: conteos[k], reverse=True)
-            xcol, ycol = cols_orden[0], cols_orden[1]
-
-            df_sc = df_emp[[xcol, ycol]].dropna()
-            if len(df_sc) > 1:
-                x = df_sc[xcol].values
-                y = df_sc[ycol].values
-
-                try:
-                    m, b = np.polyfit(x, y, 1)
-                    y_fit = m * x + b
-                except Exception:
-                    y_fit = None
-
-                fig_b, ax_b = plt.subplots(figsize=(3.5, 3), dpi=100)
-                ax_b.scatter(x, y, alpha=0.7, s=20)
-                if y_fit is not None:
-                    ax_b.plot(x, y_fit, color='orange', linewidth=1.2)
-
-                ax_b.set_xlabel(xcol, fontsize=8)
-                ax_b.set_ylabel(ycol, fontsize=8)
-                ax_b.set_title(f"Dispersión: {ycol} vs {xcol}", fontsize=9)
-                ax_b.grid(alpha=0.25, linestyle='--')
-                fig_b.tight_layout()
-                render_fig_en_frame(fig_b, frame_b)
-            else:
-                ttk.Label(frame_b, text="no hay suficientes puntos para scatter", background="#F5F5F5").pack(expand=True, fill="both")
-        else:
-            ttk.Label(frame_b, text="menos de 2 columnas numéricas", background="#F5F5F5").pack(expand=True, fill="both")
-    except Exception as e:
-        print("debug: error grafico scatter:", e)
-
-    #--------- GRAFICO C: pico vs valle (1,0) ----------
-    try:
-        frame_c = ttk.Frame(marco_graficos, padding=6)
-        frame_c.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
-
-        candidatos_pico = ["frecuencia_de_despacho_hora_pico", "frecuencia_de_despacho_pico", "frecuencia_pico", "frecuencia_de_pico"]
-        candidatos_valle = ["frecuencia_despacho_hora_valle", "frecuencia_de_despacho_hora_valle", "frecuencia_valle", "frecuencia_de_valle"]
-
-        pico_col = next((c for c in candidatos_pico if c in df_emp.columns), None)
-        valle_col = next((c for c in candidatos_valle if c in df_emp.columns), None)
-
-        if pico_col or valle_col:
-            valores_pico = df_emp[pico_col].dropna() if pico_col else pd.Series(dtype=float)
-            valores_valle = df_emp[valle_col].dropna() if valle_col else pd.Series(dtype=float)
-
-            medias = [
-                valores_pico.mean() if not valores_pico.empty else np.nan,
-                valores_valle.mean() if not valores_valle.empty else np.nan
-            ]
-            desv = [
-                valores_pico.std() if not valores_pico.empty else np.nan,
-                valores_valle.std() if not valores_valle.empty else np.nan
-            ]
-
-            if not all(np.isnan(medias)):
-                medias_plot = [0 if np.isnan(m) else m for m in medias]
-                desv_plot = [0 if np.isnan(d) else d for d in desv]
-
-                etiquetas = ['Pico', 'Valle']
-                x = np.arange(len(etiquetas))
-
-                fig_c, ax_c = plt.subplots(figsize=(3.5, 3), dpi=100)
-                ax_c.bar(x, medias_plot, width=0.6, yerr=desv_plot, capsize=5)
-                ax_c.set_xticks(x)
-                ax_c.set_xticklabels(etiquetas, fontsize=8)
-                ax_c.set_ylabel('Frecuencia (media)', fontsize=8)
-                ax_c.set_title('Media ± desviación: Pico vs Valle', fontsize=9)
-                ax_c.grid(axis='y', alpha=0.25, linestyle='--')
-                fig_c.tight_layout()
-                render_fig_en_frame(fig_c, frame_c)
-            else:
-                ttk.Label(frame_c, text="no hay datos suficientes", background="#F5F5F5").pack(expand=True, fill="both")
-        else:
-            ttk.Label(frame_c, text="no se encontraron columnas pico/valle", background="#F5F5F5").pack(expand=True, fill="both")
-    except Exception as e:
-        print("debug: error grafico pico/valle:", e)
-
-    #--------- GRAFICO D: longitudes (1,1) ----------
-    try:
-        frame_d = ttk.Frame(marco_graficos, padding=6)
-        frame_d.grid(row=1, column=1, sticky="nsew", padx=6, pady=6)
-
-        long_col = next((c for c in posibles_long if c in df_emp.columns), None)
-        if long_col:
-            longitudes = pd.to_numeric(df_emp[long_col].dropna(), errors="coerce")
-            if not longitudes.empty:
-                bins = 8
-                hist, bin_edges = np.histogram(longitudes, bins=bins)
-                bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-
-                fig_d, ax_d = plt.subplots(figsize=(3.5, 3), dpi=100)
-                ax_d.bar(bin_centers, hist, width=(bin_edges[1]-bin_edges[0])*0.9)
-                ax_d.set_xlabel("Longitud (km)", fontsize=8)
-                ax_d.set_ylabel("Frecuencia", fontsize=8)
-                ax_d.set_title("Distribución longitudes (km)", fontsize=9)
-                ax_d.grid(alpha=0.25)
-                fig_d.tight_layout()
-                render_fig_en_frame(fig_d, frame_d)
-            else:
-                ttk.Label(frame_d, text="sin datos de longitudes", background="#F5F5F5").pack(expand=True, fill="both")
-        else:
-            ttk.Label(frame_d, text="columna longitudes no encontrada", background="#F5F5F5").pack(expand=True, fill="both")
-    except Exception as e:
-        print("debug: error grafico longitudes:", e)
-
-    #--------- resumen ----------
+    #estadísticas numéricas seguras (round solo si hay valores)
     try:
         cant = len(df_emp)
         cap_max = df_emp["capacidad_maxima"].mean() if "capacidad_maxima" in df_emp.columns else float("nan")
         cap_min = df_emp["capacidad_minima"].mean() if "capacidad_minima" in df_emp.columns else float("nan")
-        frec_pico = df_emp[pico_col].mean() if pico_col in df_emp.columns else float("nan")
-        frec_valle = df_emp[valle_col].mean() if valle_col in df_emp.columns else float("nan")
+        frec_pico = df_emp["frecuencia_de_despacho_hora_pico"].mean() if "frecuencia_de_despacho_hora_pico" in df_emp.columns else float("nan")
+        frec_valle = df_emp["frecuencia_despacho_hora_valle"].mean() if "frecuencia_despacho_hora_valle" in df_emp.columns else float("nan")
 
         texto = (
             f"• Vehículos registrados: {cant}\n\n"
-            f"• Capacidad máxima promedio: {round(cap_max,2) if not pd.isna(cap_max) else 'N/A'}\n\n"
-            f"• Capacidad mínima promedio: {round(cap_min,2) if not pd.isna(cap_min) else 'N/A'}\n\n"
-            f"• Frecuencia hora pico (promedio): {round(frec_pico,2) if not pd.isna(frec_pico) else 'N/A'}\n\n"
-            f"• Frecuencia hora valle (promedio): {round(frec_valle,2) if not pd.isna(frec_valle) else 'N/A'}"
+            f"• Capacidad Máxima promedio: {round(cap_max, 2) if not pd.isna(cap_max) else 'N/A'}\n\n"
+            f"• Capacidad Mínima promedio: {round(cap_min, 2) if not pd.isna(cap_min) else 'N/A'}\n\n"
+            f"• Frecuencia hora pico promedio: {round(frec_pico, 2) if not pd.isna(frec_pico) else 'N/A'}\n\n"
+            f"• Frecuencia hora valle promedio: {round(frec_valle, 2) if not pd.isna(frec_valle) else 'N/A'}"
         )
     except Exception as e:
         print("debug: error calculando estadisticas:", e)
-        texto = "No fue posible calcular estadísticas."
+        texto = "No fue posible calcular estadísticas numéricas."
 
+    #panel de información (debajo de la gráfica)
     frame_info = tk.Frame(frame_scroll, bg="white", bd=1, relief="solid")
-    frame_info.pack(padx=20, pady=10, fill="x")
+    frame_info.pack(padx=30, pady=20, fill="x")
+    lbl_info = tk.Label(frame_info, text=texto, font=("Arial", 12), bg="white", justify="left", anchor="w")
+    lbl_info.pack(padx=20, pady=20)
 
-    lbl_info = tk.Label(frame_info, text=texto, font=("Arial", 12), bg="white", justify="left")
-    lbl_info.pack(padx=12, pady=12)
-
-    #acción al cerrar
+    #acción al cerrar: asegurar que la ventana principal se revele
     def al_cerrar():
         try:
             ven_emp.destroy()
@@ -457,6 +322,7 @@ def invempresas(nombre):
     ven_emp.protocol("WM_DELETE_WINDOW", al_cerrar)
 
 
+#;-;###########################################################################
 ########################################################################################
 #####################################################################################
 ########################################################################################
