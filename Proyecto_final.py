@@ -129,11 +129,246 @@ def solicitar_credenciales(padre):
     return resultado[0]
 
 
-def a():
+def a(): # El placeholder supremo de la función, se uso para pruebas
     print("algo")
 
+
+####################################################################3
+#################################################################
+##ver estadisticas de todas las empresas
+#########################################################################3
+#########################################################3
+
 def allempresas():
-    print("MOSTRAR TODAS LAS EMPRESAS")
+    #mostrar estadisticas agregadas de todas las empresas
+    try:
+        df_todas = df.copy()
+    except Exception as e:
+        print("debug: no se pudo copiar df:", e)
+        try:
+            tk.messagebox.showerror("Error", "No fue posible acceder a los datos.")
+        except:
+            pass
+        return
+
+    #si no hay datos, avisar
+    if df_todas.empty:
+        try:
+            tk.messagebox.showinfo("Información", "No hay registros en el dataset.")
+        except:
+            pass
+        return
+
+    #crear ventana principal
+    ven_all = tk.Toplevel(ventana)
+    ven_all.title("Estadísticas — Todas las empresas")
+    ven_all.geometry("1000x800")
+    ven_all.config(bg="#F5F5F5")
+    ven_all.transient(ventana)
+    ven_all.grab_set()
+
+    #header fijo superior con título y botón volver
+    marco_header = ttk.Frame(ven_all, padding=(10,6))
+    marco_header.pack(side="top", fill="x")
+    etiqueta_titulo = ttk.Label(marco_header, text="Estadísticas agregadas — Todas las empresas", font=("Arial", 16, "bold"))
+    etiqueta_titulo.pack(side="left", padx=(6,0))
+    btn_volver_header = tk.Button(
+        marco_header,
+        text="Volver al menú principal",
+        font=("Arial", 11),
+        width=22,
+        height=1,
+        bg="#D9EAF7",
+        command=lambda: cerrar_y_volver(ven_all)
+    )
+    btn_volver_header.pack(side="right", padx=(0,10))
+
+    #área scrollable para contenido
+    contenedor = tk.Frame(ven_all)
+    contenedor.pack(fill="both", expand=True)
+    canvas = tk.Canvas(contenedor, bg="#F5F5F5")
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar = tk.Scrollbar(contenedor, orient="vertical", command=canvas.yview)
+    scrollbar.pack(side="right", fill="y")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    frame_scroll = tk.Frame(canvas, bg="#F5F5F5")
+    canvas.create_window((0, 0), window=frame_scroll, anchor="nw")
+    def actualizar_scroll(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+    frame_scroll.bind("<Configure>", actualizar_scroll)
+
+    #función auxiliar para convertir columnas numéricas
+    def convertir_numericas_seguras(df_local, candidatos):
+        for c in candidatos:
+            if c in df_local.columns:
+                df_local[c] = (df_local[c].astype(str)
+                               .str.replace(",", ".", regex=False)
+                               .str.extract(r"([-+]?\d*\.?\d+)")[0])
+                df_local[c] = pd.to_numeric(df_local[c], errors="coerce")
+        return df_local
+
+    #columnas candidatas para frecuencia y longitudes
+    candidatos_freq = [
+        "frecuencia_de_despacho_hora_pico", "frecuencia_de_despacho_pico", "frecuencia_pico",
+        "frecuencia_despacho_hora_valle", "frecuencia_de_despacho_hora_valle", "frecuencia_valle",
+        "frecuencia_despacho_hora_valle"
+    ]
+    posibles_long = ["long_km", "longitud", "longitud_km", "long_km"]
+
+    #convertir numéricas en el df agregado
+    df_todas = convertir_numericas_seguras(df_todas, candidatos_freq)
+    df_todas = convertir_numericas_seguras(df_todas, posibles_long)
+    df_todas = convertir_numericas_seguras(df_todas, ["capacidad_minima", "capacidad_maxima"])
+
+    #marco rejilla: dos columnas arriba, fila ancha abajo
+    marco_graficos = ttk.Frame(frame_scroll)
+    marco_graficos.pack(padx=10, pady=8, fill="both", expand=False)
+    marco_graficos.columnconfigure(0, weight=1)
+    marco_graficos.columnconfigure(1, weight=1)
+
+    #función para renderizar figura dentro de frame
+    def render_fig_en_frame(fig, parent_frame):
+        try:
+            canvas_fig = FigureCanvasTkAgg(fig, master=parent_frame)
+            canvas_fig.draw()
+            widget = canvas_fig.get_tk_widget()
+            widget.pack(fill="both", expand=True)
+        except Exception as e:
+            print("debug: error renderizando figura en frame:", e)
+
+    #--------- GRAFICO 1 (0,0): scatter usando las dos columnas numéricas con más datos ----------
+    try:
+        frame_a = ttk.Frame(marco_graficos, padding=6)
+        frame_a.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+
+        num_cols = df_todas.select_dtypes(include=[np.number]).columns.tolist()
+        num_cols = [c for c in num_cols if c not in ("id",)]
+        if len(num_cols) >= 2:
+            conteos = {c: df_todas[c].count() for c in num_cols}
+            cols_orden = sorted(conteos, key=lambda k: conteos[k], reverse=True)
+            xcol, ycol = cols_orden[0], cols_orden[1]
+            df_sc = df_todas[[xcol, ycol]].dropna()
+            if len(df_sc) > 1:
+                x = df_sc[xcol].values
+                y = df_sc[ycol].values
+                try:
+                    m, b = np.polyfit(x, y, 1)
+                    y_fit = m * x + b
+                except Exception:
+                    y_fit = None
+                fig_a, ax_a = plt.subplots(figsize=(4,3), dpi=100)
+                ax_a.scatter(x, y, alpha=0.6, s=18)
+                if y_fit is not None:
+                    ax_a.plot(x, y_fit, color='orange', linewidth=1.2)
+                ax_a.set_xlabel(xcol, fontsize=8)
+                ax_a.set_ylabel(ycol, fontsize=8)
+                ax_a.set_title(f"Dispersión: {ycol} vs {xcol}", fontsize=9)
+                ax_a.grid(alpha=0.25, linestyle='--')
+                fig_a.tight_layout()
+                render_fig_en_frame(fig_a, frame_a)
+            else:
+                ttk.Label(frame_a, text="no hay suficientes datos numéricos", background="#F5F5F5").pack(expand=True, fill="both")
+        else:
+            ttk.Label(frame_a, text="menos de 2 columnas numéricas en el dataset", background="#F5F5F5").pack(expand=True, fill="both")
+    except Exception as e:
+        print("debug: error grafico scatter todas:", e)
+
+    #--------- GRAFICO 2 (0,1): pico vs valle (media ± desviación) ----------
+    try:
+        frame_b = ttk.Frame(marco_graficos, padding=6)
+        frame_b.grid(row=0, column=1, sticky="nsew", padx=6, pady=6)
+
+        candidatos_pico = ["frecuencia_de_despacho_hora_pico", "frecuencia_de_despacho_pico", "frecuencia_pico", "frecuencia_de_pico"]
+        candidatos_valle = ["frecuencia_despacho_hora_valle", "frecuencia_de_despacho_hora_valle", "frecuencia_valle", "frecuencia_de_valle"]
+
+        pico_col = next((c for c in candidatos_pico if c in df_todas.columns), None)
+        valle_col = next((c for c in candidatos_valle if c in df_todas.columns), None)
+
+        if pico_col or valle_col:
+            valores_pico = df_todas[pico_col].dropna() if pico_col else pd.Series(dtype=float)
+            valores_valle = df_todas[valle_col].dropna() if valle_col else pd.Series(dtype=float)
+
+            medias = [valores_pico.mean() if not valores_pico.empty else np.nan,
+                      valores_valle.mean() if not valores_valle.empty else np.nan]
+            desv = [valores_pico.std() if not valores_pico.empty else np.nan,
+                   valores_valle.std() if not valores_valle.empty else np.nan]
+
+            if not all(np.isnan(medias)):
+                medias_plot = [0 if np.isnan(m) else m for m in medias]
+                desv_plot = [0 if np.isnan(d) else d for d in desv]
+                etiquetas = ['Pico', 'Valle']
+                x = np.arange(len(etiquetas))
+                fig_b, ax_b = plt.subplots(figsize=(4,3), dpi=100)
+                ax_b.bar(x, medias_plot, width=0.6, yerr=desv_plot, capsize=5)
+                ax_b.set_xticks(x)
+                ax_b.set_xticklabels(etiquetas, fontsize=8)
+                ax_b.set_ylabel('Frecuencia (media)', fontsize=8)
+                ax_b.set_title('Media ± desviación: Pico vs Valle', fontsize=9)
+                ax_b.grid(axis='y', alpha=0.25, linestyle='--')
+                fig_b.tight_layout()
+                render_fig_en_frame(fig_b, frame_b)
+            else:
+                ttk.Label(frame_b, text="no hay datos para Pico/Valle", background="#F5F5F5").pack(expand=True, fill="both")
+        else:
+            ttk.Label(frame_b, text="no se encontraron columnas Pico/Valle", background="#F5F5F5").pack(expand=True, fill="both")
+    except Exception as e:
+        print("debug: error grafico pico/valle todas:", e)
+
+    #--------- GRAFICO 3 (fila inferior, ancho completo): barras de terminales ----------
+    try:
+        frame_c = ttk.Frame(frame_scroll, padding=6)
+        frame_c.pack(fill="both", expand=False, padx=6, pady=(6,12))
+
+        if "terminal" in df_todas.columns and not df_todas["terminal"].dropna().empty:
+            conteo_term = df_todas["terminal"].value_counts()
+            fig_c, ax_c = plt.subplots(figsize=(9,3), dpi=100)
+            conteo_term.plot(kind="bar", ax=ax_c)
+            ax_c.set_title("Frecuencia de terminales — Todas las empresas", fontsize=10)
+            ax_c.set_xlabel("Terminal")
+            ax_c.set_ylabel("Cantidad")
+            plt.setp(ax_c.get_xticklabels(), rotation=45, ha="right", fontsize=8)
+            ax_c.grid(alpha=0.25)
+            fig_c.tight_layout()
+            render_fig_en_frame(fig_c, frame_c)
+        else:
+            ttk.Label(frame_c, text="sin datos de terminales en el dataset", background="#F5F5F5").pack(expand=True, fill="both")
+    except Exception as e:
+        print("debug: error grafico terminales todas:", e)
+
+    #--------- resumen estadístico debajo ----------
+    try:
+        total_reg = len(df_todas)
+        cap_max = df_todas["capacidad_maxima"].mean() if "capacidad_maxima" in df_todas.columns else float("nan")
+        cap_min = df_todas["capacidad_minima"].mean() if "capacidad_minima" in df_todas.columns else float("nan")
+        texto = (
+            f"• Registros totales: {total_reg}\n\n"
+            f"• Capacidad máxima promedio: {round(cap_max,2) if not pd.isna(cap_max) else 'N/A'}\n\n"
+            f"• Capacidad mínima promedio: {round(cap_min,2) if not pd.isna(cap_min) else 'N/A'}"
+        )
+    except Exception as e:
+        print("debug: error calculando resumen todas:", e)
+        texto = "No fue posible calcular estadísticas."
+
+    frame_info = tk.Frame(frame_scroll, bg="white", bd=1, relief="solid")
+    frame_info.pack(padx=20, pady=10, fill="x")
+    lbl_info = tk.Label(frame_info, text=texto, font=("Arial", 12), bg="white", justify="left")
+    lbl_info.pack(padx=12, pady=12)
+
+    #acción al cerrar
+    def al_cerrar():
+        try:
+            ven_all.destroy()
+        finally:
+            try:
+                ventana.deiconify()
+            except:
+                pass
+
+    ven_all.protocol("WM_DELETE_WINDOW", al_cerrar)
+
+##############################################################################3
+###############################################################################3
+##############################################################
 
 def cerrar_y_volver(ventana_actual):
     # Cerrar la ventana secundaria
