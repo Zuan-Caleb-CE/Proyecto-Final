@@ -58,6 +58,50 @@ else:
 
 bloqueado = False      # Para controlar la activación/desactivación
 
+def solicitar_credenciales(padre):
+    #abrir ventana modal para pedir usuario y contraseña
+    credenciales_validas = {"admin":"1234"}  #CONTRASEÑA FIJA PARA PRUEBAS
+    resultado = [False]  #lista mutable para capturar resultado desde la ventana modal
+
+    ventana_cred = tk.Toplevel(padre)
+    ventana_cred.transient(padre)
+    ventana_cred.grab_set()
+    ventana_cred.title("Autenticación")
+    ventana_cred.geometry("320x160")
+
+    usuario_var = tk.StringVar()
+    clave_var = tk.StringVar()
+
+    ttk.Label(ventana_cred, text="usuario:").grid(row=0, column=0, pady=(12,6), padx=10, sticky="w")
+    entrada_usuario = ttk.Entry(ventana_cred, textvariable=usuario_var, width=30)
+    entrada_usuario.grid(row=0, column=1, pady=(12,6), padx=10)
+
+    ttk.Label(ventana_cred, text="contraseña:").grid(row=1, column=0, pady=(6,6), padx=10, sticky="w")
+    entrada_clave = ttk.Entry(ventana_cred, textvariable=clave_var, show="*", width=30)
+    entrada_clave.grid(row=1, column=1, pady=(6,6), padx=10)
+
+    def comprobar():
+        usu = usuario_var.get().strip()
+        cla = clave_var.get().strip()
+        if credenciales_validas.get(usu) == cla:
+            resultado[0] = True
+            ventana_cred.destroy()
+        else:
+            try:
+                tk.messagebox.showerror("Error", "usuario o contraseña incorrectos")
+            except:
+                pass
+
+    btn_aceptar = ttk.Button(ventana_cred, text="Aceptar", command=comprobar)
+    btn_aceptar.grid(row=2, column=0, pady=12, padx=10)
+    btn_cancel = ttk.Button(ventana_cred, text="Cancelar", command=ventana_cred.destroy)
+    btn_cancel.grid(row=2, column=1, pady=12, padx=10)
+
+    entrada_usuario.focus_set()
+    ventana_cred.wait_window()  #espera hasta que se cierre la ventana modal
+    return resultado[0]
+
+
 def a():
     print("algo")
 
@@ -440,157 +484,298 @@ def visualizacion_rutas():
 # -------------------------------------------------------------
 # agregar vehiculo - ventana emergente 4
 # -------------------------------------------------------------
-def ventana_emergente_4(parent):
-    """
-    Crea la ventana emergente tipo 'Formulario' (dos columnas) con:
-    - botones para agregar recorrido/empresa/terminal
-    - varios campos (Entry / Combobox)
-    - botones Guardar y Cancelar
-    parent: la ventana padre (normalmente tu `ventana` o `root`)
-    """
-    # --- Crear Toplevel ---
-    top = tk.Toplevel(parent)
-    top.title("Ventana emergente 4")
-    top.transient(parent)    # mantiene encima de parent
-    top.grab_set()           # hace modal la ventana
-    top.geometry("900x900")  # ajusta al tamaño que quieras
+def ventana_emergente_4(padre):
+    #crear ventana toplevel
+    ventana = tk.Toplevel(padre)
+    ventana.title("Ventana emergente")
+    ventana.transient(padre)
+    ventana.grab_set()
+    ventana.geometry("900x900")
 
-    # Opcional: estilo ttk
-    style = ttk.Style(top)
-    style.theme_use('clam')  # 'clam' funciona bien para personalizar
-    style.configure("TButton", padding=10)
-    style.configure("TEntry", padding=6)
-    style.configure("TLabel", padding=6)
+    #preparar opciones desde el dataframe
+    try:
+        serie_empresas = df_filtrado["empresa"].dropna().astype(str).str.replace(
+            "OPERACIÓN AUTORIZADA A ", "", regex=False).str.strip()
+        opciones_empresa = sorted(serie_empresas.unique().tolist())
+    except Exception as e:
+        print("debug: no se pudo obtener empresas desde df_filtrado:", e)
+        opciones_empresa = ["Empresa A", "Empresa B"]
 
-    # Frame principal con padding
-    main = ttk.Frame(top, padding=(20, 20, 20, 20))
-    main.grid(row=0, column=0, sticky="nsew")
-    top.columnconfigure(0, weight=1)
-    top.rowconfigure(0, weight=1)
+    try:
+        if 'terminales' in globals() and terminales:
+            opciones_terminal = sorted(list(terminales))
+        else:
+            opciones_terminal = sorted(df_filtrado["terminal"].dropna().astype(str).str.strip().unique().tolist())
+    except Exception as e:
+        print("debug: no se pudo obtener terminales:", e)
+        opciones_terminal = ["Terminal 1", "Terminal 2"]
 
-    # Más control de layout: dos columnas (left / right)
-    left = ttk.Frame(main)
-    right = ttk.Frame(main)
-    left.grid(row=2, column=0, padx=(10, 30), sticky="n")
-    right.grid(row=2, column=1, padx=(30, 10), sticky="n")
+    def limpiar_lista_horas(lista):
+        return sorted({str(x).strip() for x in lista if str(x).strip() and str(x).strip().lower() not in ("nan", "none")})
 
-    # Encabezado (fila 0)
-    encabezado = ttk.Label(main, text="Seleccione las dos siguientes opciones:", anchor="center")
-    encabezado.grid(row=0, column=0, columnspan=2, pady=(0, 20), sticky="ew")
+    try:
+        horas_primer_despacho = limpiar_lista_horas(df_filtrado["hora_primer_despacho"].dropna().astype(str).tolist())
+    except Exception:
+        horas_primer_despacho = []
+    try:
+        horas_ultimo_despacho = limpiar_lista_horas(df_filtrado["hora_ultimo_despacho"].dropna().astype(str).tolist())
+    except Exception:
+        horas_ultimo_despacho = []
 
-    # Botón Agrega Recorrido (alineado a la izquierda, arriba)
-    btn_recorrido = ttk.Button(main, text="Agrega Recorrido")
-    btn_recorrido.grid(row=1, column=0, columnspan=1, sticky="w", pady=(0, 12))
+    if not horas_primer_despacho:
+        horas_primer_despacho = [f"{h:02d}:00" for h in range(0, 24)]
+    if not horas_ultimo_despacho:
+        horas_ultimo_despacho = [f"{h:02d}:00" for h in range(0, 24)]
 
-    # Entrada grande "Ingrese texto" (fila 1 spanning columns)
-    entrada_texto_principal = ttk.Entry(main, width=90)
-    entrada_texto_principal.insert(0, "")  # placeholder si quieres
-    entrada_texto_principal.grid(row=1, column=0, columnspan=2, pady=(50, 20), sticky="ew")
+    opciones_clase = None
+    posibles_columnas_clase = ["clase", "tipo", "servicio", "tipo_servicio", "clase_vehiculo"]
+    for columna in posibles_columnas_clase:
+        if columna in df_filtrado.columns:
+            try:
+                opciones_clase = sorted(df_filtrado[columna].dropna().astype(str).str.strip().unique().tolist())
+                break
+            except Exception:
+                opciones_clase = None
+    if not opciones_clase:
+        opciones_clase = ["Clase 1", "Clase 2"]
 
-    # --- Campos izquierda ---
-    # Agrega Empresa + combobox
-    btn_agregar_empresa = ttk.Button(left, text="Agrega Empresa")
-    btn_agregar_empresa.grid(row=0, column=0, pady=(0,8), sticky="w")
+    #estilos
+    estilo = ttk.Style(ventana)
+    estilo.theme_use('clam')
+    estilo.configure("TButton", padding=8)
+    estilo.configure("TEntry", padding=4)
+    estilo.configure("TLabel", padding=4)
+
+    #frames principales
+    marco_principal = ttk.Frame(ventana, padding=(20, 20, 20, 20))
+    marco_principal.grid(row=0, column=0, sticky="nsew")
+    ventana.columnconfigure(0, weight=1)
+    ventana.rowconfigure(0, weight=1)
+
+    marco_izq = ttk.Frame(marco_principal)
+    marco_der = ttk.Frame(marco_principal)
+    marco_izq.grid(row=2, column=0, padx=(10, 30), sticky="n")
+    marco_der.grid(row=2, column=1, padx=(30, 10), sticky="n")
+
+    etiqueta_encabezado = ttk.Label(marco_principal, text="Seleccione las siguientes opciones:", anchor="center")
+    etiqueta_encabezado.grid(row=0, column=0, columnspan=2, pady=(0, 20), sticky="ew")
+
+    btn_agregar_recorrido = ttk.Button(marco_principal, text="Agregar recorrido")
+    btn_agregar_recorrido.grid(row=1, column=0, columnspan=1, sticky="w", pady=(0, 12))
+
+    entrada_texto = ttk.Entry(marco_principal, width=90)
+    entrada_texto.insert(0, "")
+    entrada_texto.grid(row=1, column=0, columnspan=2, pady=(50, 20), sticky="ew")
+
+    #columna izquierda
+    btn_agregar_empresa = ttk.Button(marco_izq, text="Agregar empresa")
+    btn_agregar_empresa.grid(row=0, column=0, pady=(0, 8), sticky="w")
 
     empresa_var = tk.StringVar()
-    combo_empresa = ttk.Combobox(left, textvariable=empresa_var, values=["Empresa A", "Empresa B", "Empresa C"], state="readonly", width=30)
-    combo_empresa.grid(row=1, column=0, pady=(0,12), sticky="w")
+    combo_empresa = ttk.Combobox(
+        marco_izq, textvariable=empresa_var,
+        values=opciones_empresa, state="readonly", width=35
+    )
+    combo_empresa.set("Seleccione una empresa...")
+    combo_empresa.grid(row=1, column=0, pady=(0, 12), sticky="w")
 
-    # Capacidad Minima
-    ttk.Label(left, text="Capacidad Minima").grid(row=2, column=0, sticky="w")
-    cap_min_var = tk.StringVar()
-    entry_cap_min = ttk.Entry(left, textvariable=cap_min_var, width=30)
-    entry_cap_min.grid(row=3, column=0, pady=(0,12), sticky="w")
+    ttk.Label(marco_izq, text="Capacidad mínima").grid(row=2, column=0, sticky="w")
+    capacidad_min_var = tk.StringVar()
+    entrada_capacidad_min = ttk.Entry(marco_izq, textvariable=capacidad_min_var, width=30)
+    entrada_capacidad_min.grid(row=3, column=0, pady=(0, 12), sticky="w")
 
-    # Frecuencia despacho hora pico
-    ttk.Label(left, text="Frecuencia de despacho hora pico").grid(row=4, column=0, sticky="w")
-    freq_pico_var = tk.StringVar()
-    entry_freq_pico = ttk.Entry(left, textvariable=freq_pico_var, width=30)
-    entry_freq_pico.grid(row=5, column=0, pady=(0,12), sticky="w")
+    ttk.Label(marco_izq, text="Frecuencia hora pico").grid(row=4, column=0, sticky="w")
+    frecuencia_pico_var = tk.StringVar()
+    entrada_frecuencia_pico = ttk.Entry(marco_izq, textvariable=frecuencia_pico_var, width=30)
+    entrada_frecuencia_pico.grid(row=5, column=0, pady=(0, 12), sticky="w")
 
-    # Hora de primer despacho (combobox)
-    ttk.Label(left, text="Hora de primer despacho").grid(row=6, column=0, sticky="w")
-    first_hour_var = tk.StringVar()
-    combo_first_hour = ttk.Combobox(left, textvariable=first_hour_var,
-                                    values=[f"{h:02d}:00" for h in range(0,24)], width=30, state="readonly")
-    combo_first_hour.grid(row=7, column=0, pady=(0,12), sticky="w")
+    ttk.Label(marco_izq, text="Hora primer despacho").grid(row=6, column=0, sticky="w")
+    hora_primer_var = tk.StringVar()
+    combo_hora_primer = ttk.Combobox(
+        marco_izq, textvariable=hora_primer_var,
+        values=horas_primer_despacho, width=30, state="readonly"
+    )
+    combo_hora_primer.set("Seleccione hora...")
+    combo_hora_primer.grid(row=7, column=0, pady=(0, 12), sticky="w")
 
-    # Longitud de km
-    ttk.Label(left, text="Longitud de km").grid(row=8, column=0, sticky="w")
+    ttk.Label(marco_izq, text="Longitud (km)").grid(row=8, column=0, sticky="w")
     longitud_var = tk.StringVar()
-    entry_longitud = ttk.Entry(left, textvariable=longitud_var, width=30)
-    entry_longitud.grid(row=9, column=0, pady=(0,20), sticky="w")
+    entrada_longitud = ttk.Entry(marco_izq, textvariable=longitud_var, width=30)
+    entrada_longitud.grid(row=9, column=0, pady=(0, 20), sticky="w")
 
-    # Cancelar (abajo izquierda)
     def cancelar():
-        top.destroy()
+        ventana.destroy()
 
-    btn_cancel = ttk.Button(left, text="Cancelar", command=cancelar)
-    btn_cancel.grid(row=10, column=0, pady=(30,0), sticky="w")
+    btn_cancelar = ttk.Button(marco_izq, text="Cancelar", command=cancelar)
+    btn_cancelar.grid(row=10, column=0, pady=(30, 0), sticky="w")
 
-    # --- Campos derecha ---
-    # Agrega Terminal + combobox
-    btn_agregar_terminal = ttk.Button(right, text="Agrega Terminal")
-    btn_agregar_terminal.grid(row=0, column=0, pady=(0,8), sticky="e")
+    #columna derecha
+    btn_agregar_terminal = ttk.Button(marco_der, text="Agregar terminal")
+    btn_agregar_terminal.grid(row=0, column=0, pady=(0, 8), sticky="e")
 
     terminal_var = tk.StringVar()
-    combo_terminal = ttk.Combobox(right, textvariable=terminal_var, values=["Terminal 1", "Terminal 2"], state="readonly", width=30)
-    combo_terminal.grid(row=1, column=0, pady=(0,12), sticky="e")
+    combo_terminal = ttk.Combobox(
+        marco_der, textvariable=terminal_var,
+        values=opciones_terminal, state="readonly", width=35
+    )
+    combo_terminal.set("Seleccione un terminal...")
+    combo_terminal.grid(row=1, column=0, pady=(0, 12), sticky="e")
 
-    # Capacidad Maxima
-    ttk.Label(right, text="Capacidad Maxima").grid(row=2, column=0, sticky="e")
-    cap_max_var = tk.StringVar()
-    entry_cap_max = ttk.Entry(right, textvariable=cap_max_var, width=30)
-    entry_cap_max.grid(row=3, column=0, pady=(0,12), sticky="e")
+    ttk.Label(marco_der, text="Capacidad máxima").grid(row=2, column=0, sticky="e")
+    capacidad_max_var = tk.StringVar()
+    entrada_capacidad_max = ttk.Entry(marco_der, textvariable=capacidad_max_var, width=30)
+    entrada_capacidad_max.grid(row=3, column=0, pady=(0, 12), sticky="e")
 
-    # Frecuencia despacho hora valle
-    ttk.Label(right, text="Frecuencia de despacho hora valle").grid(row=4, column=0, sticky="e")
-    freq_valle_var = tk.StringVar()
-    entry_freq_valle = ttk.Entry(right, textvariable=freq_valle_var, width=30)
-    entry_freq_valle.grid(row=5, column=0, pady=(0,12), sticky="e")
+    ttk.Label(marco_der, text="Frecuencia hora valle").grid(row=4, column=0, sticky="e")
+    frecuencia_valle_var = tk.StringVar()
+    entrada_frecuencia_valle = ttk.Entry(marco_der, textvariable=frecuencia_valle_var, width=30)
+    entrada_frecuencia_valle.grid(row=5, column=0, pady=(0, 12), sticky="e")
 
-    # Hora de ultimo despacho (combobox)
-    ttk.Label(right, text="Hora de ultimo despacho").grid(row=6, column=0, sticky="e")
-    last_hour_var = tk.StringVar()
-    combo_last_hour = ttk.Combobox(right, textvariable=last_hour_var,
-                                   values=[f"{h:02d}:00" for h in range(0,24)], width=30, state="readonly")
-    combo_last_hour.grid(row=7, column=0, pady=(0,12), sticky="e")
+    ttk.Label(marco_der, text="Hora último despacho").grid(row=6, column=0, sticky="e")
+    hora_ultimo_var = tk.StringVar()
+    combo_hora_ultimo = ttk.Combobox(
+        marco_der, textvariable=hora_ultimo_var,
+        values=horas_ultimo_despacho, width=30, state="readonly"
+    )
+    combo_hora_ultimo.set("Seleccione hora...")
+    combo_hora_ultimo.grid(row=7, column=0, pady=(0, 12), sticky="e")
 
-    # Clase (combobox)
-    ttk.Label(right, text="Clase").grid(row=8, column=0, sticky="e")
+    ttk.Label(marco_der, text="Clase").grid(row=8, column=0, sticky="e")
     clase_var = tk.StringVar()
-    combo_clase = ttk.Combobox(right, textvariable=clase_var, values=["Clase 1", "Clase 2"], state="readonly", width=30)
-    combo_clase.grid(row=9, column=0, pady=(0,20), sticky="e")
+    combo_clase = ttk.Combobox(
+        marco_der, textvariable=clase_var,
+        values=opciones_clase, width=30, state="readonly"
+    )
+    combo_clase.set("Seleccione clase...")
+    combo_clase.grid(row=9, column=0, pady=(0, 20), sticky="e")
 
-    # Guardar (abajo derecha)
+    #guardar datos con autenticacion y persistencia
     def guardar():
-        # Aquí recoges los valores y haces lo que necesites (guardar en BD, lista, validar, etc.)
-        data = {
-            "empresa": empresa_var.get(),
-            "terminal": terminal_var.get(),
-            "cap_min": cap_min_var.get(),
-            "cap_max": cap_max_var.get(),
-            "freq_pico": freq_pico_var.get(),
-            "freq_valle": freq_valle_var.get(),
-            "first_hour": first_hour_var.get(),
-            "last_hour": last_hour_var.get(),
-            "longitud": longitud_var.get(),
-            "clase": clase_var.get(),
-            "texto": entrada_texto_principal.get(),
+        #recolectar datos del formulario
+        datos = {
+            "empresa": empresa_var.get().strip(),
+            "terminal": terminal_var.get().strip(),
+            "capacidad_minima": capacidad_min_var.get().strip(),
+            "capacidad_maxima": capacidad_max_var.get().strip(),
+            "frecuencia_de_despacho_hora_pico": frecuencia_pico_var.get().strip(),
+            "frecuencia_despacho_hora_valle": frecuencia_valle_var.get().strip(),
+            "hora_primer_despacho": hora_primer_var.get().strip(),
+            "hora_ultimo_despacho": hora_ultimo_var.get().strip(),
+            "long_km": longitud_var.get().strip(),
+            "clase": clase_var.get().strip(),
+            "ruta": entrada_texto.get().strip(),
         }
-        # ejemplo: imprime en consola (o reemplaza por tu lógica)
-        print("Guardando:", data)
-        # cerrar ventana si todo salió bien
-        top.destroy()
 
-    btn_guardar = ttk.Button(right, text="Guardar", command=guardar)
-    btn_guardar.grid(row=10, column=0, pady=(30,0), sticky="e")
+        #solicitar credenciales antes de guardar
+        autorizado = solicitar_credenciales(ventana)
+        if not autorizado:
+            try:
+                tk.messagebox.showinfo("Cancelado", "no autorizado. registro no guardado.")
+            except:
+                pass
+            return
 
-    # Ajustes finales: que las columnas escalen bien
-    main.columnconfigure(0, weight=1)
-    main.columnconfigure(1, weight=1)
-    left.columnconfigure(0, weight=1)
-    right.columnconfigure(0, weight=1)
+        #agregar fila a df global
+        try:
+            #declarar globals que vamos a modificar
+            global df, df_filtrado, terminales, lugares
+
+            #calcular nuevo codigo para el indice 'codigo'
+            try:
+                idx_numerico = pd.to_numeric(df.index.astype(str), errors="coerce")
+                max_idx = int(idx_numerico.max()) if not np.isnan(idx_numerico.max()) else None
+                if max_idx is None:
+                    nuevo_codigo = df.reset_index().shape[0] + 1
+                else:
+                    nuevo_codigo = max_idx + 1
+            except Exception:
+                nuevo_codigo = df.reset_index().shape[0] + 1
+
+            #construir fila nueva con todas las columnas existentes en df
+            fila = {}
+            for col in df.columns:
+                #rellenar con valores si el nombre de columna coincide con nuestras keys
+                if col in datos:
+                    #intentar convertir numericos simples
+                    val = datos[col]
+                    if col in ("capacidad_minima", "capacidad_maxima", "long_km",
+                               "frecuencia_de_despacho_hora_pico", "frecuencia_despacho_hora_valle"):
+                        try:
+                            val_num = float(str(val).replace(",", "."))
+                            fila[col] = val_num
+                        except:
+                            fila[col] = val
+                    else:
+                        fila[col] = datos[col]
+                else:
+                    fila[col] = np.nan
+
+            #si 'ruta' no existe en columnas, intentar usar 'recorrido' o 'ruta'
+            if "ruta" not in df.columns and "recorrido" in df.columns:
+                fila["recorrido"] = datos.get("ruta", "")
+
+            #asegurar nombre del índice
+            df.index.name = "codigo"
+            #añadir la fila
+            df.loc[nuevo_codigo] = fila
+
+            #actualizar df_filtrado (intento simple: agregar la misma fila)
+            try:
+                df_filtrado.loc[nuevo_codigo] = fila
+                #actualizar columna empresa_limpia si existe
+                if "empresa_limpia" in df_filtrado.columns:
+                    df_filtrado["empresa_limpia"] = df_filtrado["empresa"].astype(str).str.replace(
+                        "OPERACIÓN AUTORIZADA A ", "", regex=False).str.strip()
+            except Exception as e:
+                print("debug: no se pudo agregar a df_filtrado directamente:", e)
+
+            #guardar el df actualizado al CSV original
+            try:
+                df.index.name = "codigo"
+                df.to_csv("8._RUTAS_TRANSPORTE_URBANO_20251011.csv")
+            except Exception as e:
+                print("debug: error guardando CSV:", e)
+                try:
+                    tk.messagebox.showwarning("Advertencia", "registro guardado en memoria pero no se pudo escribir el CSV.")
+                except:
+                    pass
+
+            #actualizar listas globales terminales y lugares para que otras ventanas vean los cambios
+            try:
+                terminales = sorted(set(df["terminal"].dropna().astype(str).str.strip()))
+            except:
+                terminales = sorted(set(df_filtrado["terminal"].dropna().astype(str).str.strip())) if "terminal" in df_filtrado.columns else terminales
+
+            try:
+                rutas = df["ruta"].dropna().unique().tolist() if "ruta" in df.columns else []
+                lugares_separados = set()
+                for ruta in rutas:
+                    lugares_separados.update([lugar.strip() for lugar in str(ruta).split("-")])
+                lugares = sorted(lugares_separados)
+            except:
+                pass
+
+            try:
+                tk.messagebox.showinfo("Éxito", "registro guardado correctamente")
+            except:
+                pass
+
+        except Exception as e:
+            print("debug: error al guardar registro:", e)
+            try:
+                tk.messagebox.showerror("Error", f"ocurrió un error al guardar: {e}")
+            except:
+                pass
+
+        ventana.destroy()
+
+    btn_guardar = ttk.Button(marco_der, text="Guardar", command=guardar)
+    btn_guardar.grid(row=10, column=0, pady=(30, 0), sticky="e")
+
+    marco_principal.columnconfigure(0, weight=1)
+    marco_principal.columnconfigure(1, weight=1)
+    marco_izq.columnconfigure(0, weight=1)
+    marco_der.columnconfigure(0, weight=1)
 
 #############################################################################
 ##################################################################
