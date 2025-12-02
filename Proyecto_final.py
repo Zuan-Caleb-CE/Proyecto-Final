@@ -7,6 +7,91 @@ from PIL import Image, ImageTk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import re
 import unicodedata
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np 
+import tkinter as tk
+from tkinter import ttk
+from PIL import Image, ImageTk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import re
+import unicodedata
+
+#sonidos y compatibilidad (winsound en windows, si no disponible no hace nada)
+try:
+    import winsound
+except Exception:
+    winsound = None
+
+#helper para reproducir sonidos de interfaz (no falla si winsound no existe)
+def reproducir_sonido(nombre):
+    #nombre: 'abrir','click','ok','error'
+    try:
+        if winsound and platform.system()=="Windows":
+            if nombre == "abrir":
+                winsound.MessageBeep(winsound.MB_ICONASTERISK)
+            elif nombre == "click":
+                winsound.MessageBeep(winsound.MB_OK)
+            elif nombre == "ok":
+                winsound.MessageBeep(winsound.MB_OK)
+            elif nombre == "error":
+                winsound.MessageBeep(winsound.MB_ICONHAND)
+            else:
+                winsound.MessageBeep()
+        else:
+            #fallback cross-platform: si existe una ventana global, usar bell
+            try:
+                ventana.bell()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+#mostrar un cargador modal simple con progressbar indeterminada
+def mostrar_cargador(padre, texto="Cargando…"):
+    #crea un Toplevel pequeño y devuelve el objeto para cerrarlo luego
+    cargador = tk.Toplevel(padre)
+    cargador.transient(padre)
+    cargador.grab_set()
+    cargador.title("")
+    cargador.geometry("260x80")
+    try:
+        padre.update_idletasks()
+        px = padre.winfo_rootx()
+        py = padre.winfo_rooty()
+        pw = padre.winfo_width()
+        ph = padre.winfo_height()
+        cargador.geometry(f"+{px + max(10, pw//2 - 130)}+{py + max(10, ph//2 - 40)}")
+    except Exception:
+        pass
+    cargador.resizable(False, False)
+    frame = ttk.Frame(cargador, padding=(8,8))
+    frame.pack(fill="both", expand=True)
+    lbl = ttk.Label(frame, text=texto)
+    lbl.pack(pady=(2,6))
+    barra = ttk.Progressbar(frame, mode="indeterminate", length=220)
+    barra.pack()
+    barra.start(10)
+    cargador.update_idletasks()
+    return cargador
+
+#detener y destruir cargador
+def detener_cargador(cargador):
+    try:
+        for child in cargador.winfo_children():
+            if isinstance(child, ttk.Progressbar):
+                try:
+                    child.stop()
+                except:
+                    pass
+        cargador.grab_release()
+        cargador.destroy()
+    except Exception:
+        pass
+
+
+
+
 
 df = pd.read_csv("8._RUTAS_TRANSPORTE_URBANO_20251011.csv", index_col="codigo")
 print(df.columns)
@@ -1209,6 +1294,50 @@ ventana = tk.Tk()
 ventana.title("Menu Principal")
 ventana.geometry("400x450")
 ventana.config(bg="white")
+
+#cursor personalizado para botones (icono mano)
+ventana.option_add("*Button.cursor", "hand2")
+
+#tema actual (puede ser 'claro' o 'oscuro')
+tema_actual = {"valor":"claro"}
+
+#aplicar tema sencillo (colores mínimos)
+def aplicar_tema(tema):
+    #tema:'claro' o 'oscuro'
+    if tema == "oscuro":
+        fg = "white"
+        bg = "#2b2b2b"
+        panel = "#3a3a3a"
+    else:
+        fg = "black"
+        bg = "white"
+        panel = "#f5f5f5"
+    try:
+        ventana.config(bg=bg)
+    except:
+        pass
+    try:
+        style = ttk.Style()
+        style.configure("TLabel", background=panel, foreground=fg)
+        style.configure("TFrame", background=panel)
+        style.configure("TButton", padding=6)
+    except:
+        pass
+
+#toggle de tema
+def toggle_tema():
+    if tema_actual["valor"] == "claro":
+        tema_actual["valor"] = "oscuro"
+    else:
+        tema_actual["valor"] = "claro"
+    aplicar_tema(tema_actual["valor"])
+
+#botón pequeño para cambiar tema (colocar en el header principal)
+btn_tema_peq = ttk.Button(ventana, text="modo", width=5, command=lambda:[reproducir_sonido("click"), toggle_tema()])
+btn_tema_peq.place(relx=0.95, rely=0.02, anchor="ne")
+
+
+
 
 # Centrar los elementos
 ventana.columnconfigure(0, weight=1)
