@@ -139,8 +139,9 @@ def a(): # El placeholder supremo de la función, se uso para pruebas
 #########################################################################3
 #########################################################3
 
+
 def allempresas():
-    #mostrar estadisticas agregadas de todas las empresas
+    #mostrar estadisticas agregadas de todas las empresas (arreglo rapido para que no quede bajo la barra de tareas)
     try:
         df_todas = df.copy()
     except Exception as e:
@@ -159,34 +160,35 @@ def allempresas():
             pass
         return
 
-    #crear ventana principal
+    #crear ventana principal con altura reducida para evitar solapamiento con la barra de tareas
     ven_all = tk.Toplevel(ventana)
     ven_all.title("Estadísticas — Todas las empresas")
-    ven_all.geometry("1000x800")
+    ven_all.geometry("980x700")  #ancho x alto reducido para evitar taskbar
+    ven_all.minsize(800, 600)
     ven_all.config(bg="#F5F5F5")
     ven_all.transient(ventana)
     ven_all.grab_set()
 
-    #header fijo superior con título y botón volver
-    marco_header = ttk.Frame(ven_all, padding=(10,6))
+    #header fijo superior con título y botón volver (siempre visible)
+    marco_header = ttk.Frame(ven_all, padding=(8,6))
     marco_header.pack(side="top", fill="x")
-    etiqueta_titulo = ttk.Label(marco_header, text="Estadísticas agregadas — Todas las empresas", font=("Arial", 16, "bold"))
+    etiqueta_titulo = ttk.Label(marco_header, text="Estadísticas agregadas — Todas las empresas", font=("Arial", 14, "bold"))
     etiqueta_titulo.pack(side="left", padx=(6,0))
     btn_volver_header = tk.Button(
         marco_header,
         text="Volver al menú principal",
-        font=("Arial", 11),
-        width=22,
+        font=("Arial", 10),
+        width=20,
         height=1,
         bg="#D9EAF7",
         command=lambda: cerrar_y_volver(ven_all)
     )
-    btn_volver_header.pack(side="right", padx=(0,10))
+    btn_volver_header.pack(side="right", padx=(0,8))
 
-    #área scrollable para contenido
+    #área scrollable para contenido (contenido principal debe poder scrollear, header permanece)
     contenedor = tk.Frame(ven_all)
     contenedor.pack(fill="both", expand=True)
-    canvas = tk.Canvas(contenedor, bg="#F5F5F5")
+    canvas = tk.Canvas(contenedor, bg="#F5F5F5", highlightthickness=0)
     canvas.pack(side="left", fill="both", expand=True)
     scrollbar = tk.Scrollbar(contenedor, orient="vertical", command=canvas.yview)
     scrollbar.pack(side="right", fill="y")
@@ -222,7 +224,7 @@ def allempresas():
 
     #marco rejilla: dos columnas arriba, fila ancha abajo
     marco_graficos = ttk.Frame(frame_scroll)
-    marco_graficos.pack(padx=10, pady=8, fill="both", expand=False)
+    marco_graficos.pack(padx=8, pady=6, fill="both", expand=False)
     marco_graficos.columnconfigure(0, weight=1)
     marco_graficos.columnconfigure(1, weight=1)
 
@@ -236,10 +238,10 @@ def allempresas():
         except Exception as e:
             print("debug: error renderizando figura en frame:", e)
 
-    #--------- GRAFICO 1 (0,0): scatter usando las dos columnas numéricas con más datos ----------
+    #--------- GRAFICO 1 (0,0): scatter (compacto) ----------
     try:
-        frame_a = ttk.Frame(marco_graficos, padding=6)
-        frame_a.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+        frame_a = ttk.Frame(marco_graficos, padding=4)
+        frame_a.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
 
         num_cols = df_todas.select_dtypes(include=[np.number]).columns.tolist()
         num_cols = [c for c in num_cols if c not in ("id",)]
@@ -256,14 +258,14 @@ def allempresas():
                     y_fit = m * x + b
                 except Exception:
                     y_fit = None
-                fig_a, ax_a = plt.subplots(figsize=(4,3), dpi=100)
-                ax_a.scatter(x, y, alpha=0.6, s=18)
+                fig_a, ax_a = plt.subplots(figsize=(3.4,2.4), dpi=100)  #compacto
+                ax_a.scatter(x, y, alpha=0.6, s=16)
                 if y_fit is not None:
-                    ax_a.plot(x, y_fit, color='orange', linewidth=1.2)
-                ax_a.set_xlabel(xcol, fontsize=8)
-                ax_a.set_ylabel(ycol, fontsize=8)
-                ax_a.set_title(f"Dispersión: {ycol} vs {xcol}", fontsize=9)
-                ax_a.grid(alpha=0.25, linestyle='--')
+                    ax_a.plot(x, y_fit, color='orange', linewidth=1.0)
+                ax_a.set_xlabel(xcol, fontsize=7)
+                ax_a.set_ylabel(ycol, fontsize=7)
+                ax_a.set_title(f"Dispersión: {ycol} vs {xcol}", fontsize=8)
+                ax_a.grid(alpha=0.2, linestyle='--')
                 fig_a.tight_layout()
                 render_fig_en_frame(fig_a, frame_a)
             else:
@@ -273,10 +275,10 @@ def allempresas():
     except Exception as e:
         print("debug: error grafico scatter todas:", e)
 
-    #--------- GRAFICO 2 (0,1): pico vs valle (media ± desviación) ----------
+    #--------- GRAFICO 2 (0,1): pico vs valle (compacto) ----------
     try:
-        frame_b = ttk.Frame(marco_graficos, padding=6)
-        frame_b.grid(row=0, column=1, sticky="nsew", padx=6, pady=6)
+        frame_b = ttk.Frame(marco_graficos, padding=4)
+        frame_b.grid(row=0, column=1, sticky="nsew", padx=4, pady=4)
 
         candidatos_pico = ["frecuencia_de_despacho_hora_pico", "frecuencia_de_despacho_pico", "frecuencia_pico", "frecuencia_de_pico"]
         candidatos_valle = ["frecuencia_despacho_hora_valle", "frecuencia_de_despacho_hora_valle", "frecuencia_valle", "frecuencia_de_valle"]
@@ -298,13 +300,13 @@ def allempresas():
                 desv_plot = [0 if np.isnan(d) else d for d in desv]
                 etiquetas = ['Pico', 'Valle']
                 x = np.arange(len(etiquetas))
-                fig_b, ax_b = plt.subplots(figsize=(4,3), dpi=100)
-                ax_b.bar(x, medias_plot, width=0.6, yerr=desv_plot, capsize=5)
+                fig_b, ax_b = plt.subplots(figsize=(3.4,2.4), dpi=100)  #compacto
+                ax_b.bar(x, medias_plot, width=0.6, yerr=desv_plot, capsize=4)
                 ax_b.set_xticks(x)
-                ax_b.set_xticklabels(etiquetas, fontsize=8)
-                ax_b.set_ylabel('Frecuencia (media)', fontsize=8)
-                ax_b.set_title('Media ± desviación: Pico vs Valle', fontsize=9)
-                ax_b.grid(axis='y', alpha=0.25, linestyle='--')
+                ax_b.set_xticklabels(etiquetas, fontsize=7)
+                ax_b.set_ylabel('Frecuencia (media)', fontsize=7)
+                ax_b.set_title('Media ± desviación: Pico vs Valle', fontsize=8)
+                ax_b.grid(axis='y', alpha=0.2, linestyle='--')
                 fig_b.tight_layout()
                 render_fig_en_frame(fig_b, frame_b)
             else:
@@ -314,20 +316,23 @@ def allempresas():
     except Exception as e:
         print("debug: error grafico pico/valle todas:", e)
 
-    #--------- GRAFICO 3 (fila inferior, ancho completo): barras de terminales ----------
+    #--------- GRAFICO 3 (fila inferior, ancho completo): barras de terminales (ancho reducido en alto) ----------
     try:
         frame_c = ttk.Frame(frame_scroll, padding=6)
-        frame_c.pack(fill="both", expand=False, padx=6, pady=(6,12))
+        frame_c.pack(fill="both", expand=False, padx=6, pady=(6,8))
 
         if "terminal" in df_todas.columns and not df_todas["terminal"].dropna().empty:
             conteo_term = df_todas["terminal"].value_counts()
-            fig_c, ax_c = plt.subplots(figsize=(9,3), dpi=100)
-            conteo_term.plot(kind="bar", ax=ax_c)
-            ax_c.set_title("Frecuencia de terminales — Todas las empresas", fontsize=10)
+            #mostrar solo top N para evitar que la barra sea demasiado alta/ancha
+            top_n = 25
+            conteo_term_top = conteo_term.iloc[:top_n]
+            fig_c, ax_c = plt.subplots(figsize=(9,2.2), dpi=100)  #altura reducida
+            conteo_term_top.plot(kind="bar", ax=ax_c)
+            ax_c.set_title("Frecuencia de terminales — Todas las empresas (top {})".format(min(top_n, len(conteo_term))), fontsize=9)
             ax_c.set_xlabel("Terminal")
             ax_c.set_ylabel("Cantidad")
-            plt.setp(ax_c.get_xticklabels(), rotation=45, ha="right", fontsize=8)
-            ax_c.grid(alpha=0.25)
+            plt.setp(ax_c.get_xticklabels(), rotation=45, ha="right", fontsize=7)
+            ax_c.grid(alpha=0.2)
             fig_c.tight_layout()
             render_fig_en_frame(fig_c, frame_c)
         else:
@@ -335,7 +340,7 @@ def allempresas():
     except Exception as e:
         print("debug: error grafico terminales todas:", e)
 
-    #--------- resumen estadístico debajo ----------
+    #--------- resumen estadístico debajo (compacto) ----------
     try:
         total_reg = len(df_todas)
         cap_max = df_todas["capacidad_maxima"].mean() if "capacidad_maxima" in df_todas.columns else float("nan")
@@ -350,9 +355,9 @@ def allempresas():
         texto = "No fue posible calcular estadísticas."
 
     frame_info = tk.Frame(frame_scroll, bg="white", bd=1, relief="solid")
-    frame_info.pack(padx=20, pady=10, fill="x")
-    lbl_info = tk.Label(frame_info, text=texto, font=("Arial", 12), bg="white", justify="left")
-    lbl_info.pack(padx=12, pady=12)
+    frame_info.pack(padx=12, pady=8, fill="x")
+    lbl_info = tk.Label(frame_info, text=texto, font=("Arial", 11), bg="white", justify="left")
+    lbl_info.pack(padx=10, pady=8)
 
     #acción al cerrar
     def al_cerrar():
@@ -366,9 +371,11 @@ def allempresas():
 
     ven_all.protocol("WM_DELETE_WINDOW", al_cerrar)
 
+
+
 ##############################################################################3
 ###############################################################################3
-##############################################################
+#######################################################################################3
 
 def cerrar_y_volver(ventana_actual):
     # Cerrar la ventana secundaria
@@ -1138,9 +1145,6 @@ def ventana_emergente_4(padre):
     marco_principal.columnconfigure(1, weight=1)
     marco_izq.columnconfigure(0, weight=1)
     marco_der.columnconfigure(0, weight=1)
-
-
-
 
 
 #############################################################################
