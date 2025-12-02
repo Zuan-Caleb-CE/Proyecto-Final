@@ -143,26 +143,58 @@ def cerrar_y_volver(ventana_actual):
         except:
             pass
 
+
+
 def invempresas(nombre):
+    #cerrar solo ventanas secundarias antes de abrir la nueva
+    try:
+        for w in ventana.winfo_children():
+            if isinstance(w, tk.Toplevel):
+                try:
+                    w.destroy()
+                except:
+                    pass
+    except Exception as e:
+        print("debug: error cerrando toplevels previos:", e)
 
-    # Cerrar SOLO ventanas secundarias, excepto la principal
-    for w in ventana.winfo_children():
-        if isinstance(w, tk.Toplevel):
-            try:
-                w.destroy()
-            except:
-                pass
-    # Ocultar ventana principal
-    ventana.withdraw()
-    # --- Filtrar empresa ---
-    df_emp = df_filtrado[df_filtrado["empresa_limpia"] == nombre]
-
-    if df_emp.empty:
-        tk.messagebox.showerror("Error", "No hay datos para esta empresa")
-        ventana.deiconify()
+    #si el nombre es el placeholder o vacío, avisar y no continuar
+    if not nombre or nombre.strip() == "" or "Seleccione" in nombre:
+        try:
+            tk.messagebox.showinfo("Información", "Seleccione una empresa válida antes de ver.")
+        except:
+            pass
         return
 
-    # --- Crear ventana ---
+    #normalizar nombre buscado (case-insensitive)
+    nombre_buscar = nombre.strip().lower()
+
+    #filtrar de forma segura usando contains / lower para mayor tolerancia
+    try:
+        df_emp = df_filtrado[df_filtrado["empresa_limpia"].astype(str).str.strip().str.lower() == nombre_buscar].copy()
+    except Exception as e:
+        print("debug: error filtrando empresa:", e)
+        try:
+            tk.messagebox.showerror("Error", f"error interno al filtrar: {e}")
+        except:
+            pass
+        return
+
+    if df_emp.empty:
+        #intentar búsqueda por contains (por si hay diferencias pequeñas)
+        try:
+            df_emp = df_filtrado[df_filtrado["empresa_limpia"].astype(str).str.strip().str.lower().str.contains(re.escape(nombre_buscar))].copy()
+        except Exception as e:
+            print("debug: error secundario filtrando por contains:", e)
+            df_emp = pd.DataFrame()
+
+    if df_emp.empty:
+        try:
+            tk.messagebox.showerror("Error", "No hay datos para esta empresa")
+        except:
+            pass
+        return
+
+    #crear ventana nueva para mostrar estadísticas
     ven_emp = tk.Toplevel(ventana)
     ven_emp.title(f"Estadísticas — {nombre}")
     ven_emp.geometry("750x700")
@@ -170,94 +202,94 @@ def invempresas(nombre):
     ven_emp.transient(ventana)
     ven_emp.grab_set()
 
-    # ============================================================
-    #                  SCROLLBAR Y CANVAS
-    # ============================================================
+    #scrollable canvas
     contenedor = tk.Frame(ven_emp)
     contenedor.pack(fill="both", expand=True)
-
     canvas = tk.Canvas(contenedor, bg="#F5F5F5")
     canvas.pack(side="left", fill="both", expand=True)
-
     scrollbar = tk.Scrollbar(contenedor, orient="vertical", command=canvas.yview)
     scrollbar.pack(side="right", fill="y")
-
     canvas.configure(yscrollcommand=scrollbar.set)
-
-    # Para permitir scroll dentro del frame → truco oficial de Tkinter
     frame_scroll = tk.Frame(canvas, bg="#F5F5F5")
     canvas.create_window((0, 0), window=frame_scroll, anchor="nw")
-
     def actualizar_scroll(event):
         canvas.configure(scrollregion=canvas.bbox("all"))
-
     frame_scroll.bind("<Configure>", actualizar_scroll)
 
-    # ============================================================
-    #                        CONTENIDO
-    # ============================================================
-
-    # --------- Título ---------
-    lbl_titulo = tk.Label(
-        frame_scroll,
-        text=f"Empresa: {nombre}",
-        font=("Arial", 18, "bold"),
-        bg="#F5F5F5"
-    )
+    #titulo
+    lbl_titulo = tk.Label(frame_scroll, text=f"Empresa: {nombre}", font=("Arial", 18, "bold"), bg="#F5F5F5")
     lbl_titulo.pack(pady=20)
 
-    # --------- Gráfica ---------
-    conteo_term = df_emp["terminal"].value_counts()
-    fig, ax = plt.subplots(figsize=(7, 4), dpi=100)
-    conteo_term.plot(kind="bar", color="skyblue", ax=ax)
+    #asegurar columnas numéricas convertidas
+    for col in ("capacidad_maxima", "capacidad_minima", "frecuencia_de_despacho_hora_pico", "frecuencia_despacho_hora_valle"):
+        if col in df_emp.columns:
+            df_emp[col] = pd.to_numeric(df_emp[col], errors="coerce")
 
-    ax.set_title(f"Frecuencia de terminales — {nombre}", fontsize=10)
-    ax.set_xlabel("Terminal")
-    ax.set_ylabel("Cantidad")
-    plt.xticks(rotation=45, ha="right")
-    plt.tight_layout()
-    ax.grid(alpha=0.3)
+    #intentar crear la gráfica y cálculos dentro de try para capturar errores
+    try:
+        conteo_term = df_emp["terminal"].value_counts()
+        fig, ax = plt.subplots(figsize=(7, 4), dpi=100)
+        conteo_term.plot(kind="bar", ax=ax)
+        ax.set_title(f"Frecuencia de terminales — {nombre}", fontsize=10)
+        ax.set_xlabel("Terminal")
+        ax.set_ylabel("Cantidad")
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+        ax.grid(alpha=0.3)
 
-    frame_graf = tk.Frame(frame_scroll, bg="#F5F5F5")
-    frame_graf.pack(pady=10)
+        frame_graf = tk.Frame(frame_scroll, bg="#F5F5F5")
+        frame_graf.pack(pady=10)
+        canvas_graf = FigureCanvasTkAgg(fig, master=frame_graf)
+        canvas_graf.draw()
+        canvas_graf.get_tk_widget().pack()
+    except Exception as e:
+        print("debug: error creando grafica:", e)
+        try:
+            tk.messagebox.showwarning("Advertencia", f"No se pudo generar la gráfica: {e}")
+        except:
+            pass
 
-    canvas_graf = FigureCanvasTkAgg(fig, master=frame_graf)
-    canvas_graf.draw()
-    canvas_graf.get_tk_widget().pack()
+    #estadísticas numéricas seguras (round solo si hay valores)
+    try:
+        cant = len(df_emp)
+        cap_max = df_emp["capacidad_maxima"].mean() if "capacidad_maxima" in df_emp.columns else float("nan")
+        cap_min = df_emp["capacidad_minima"].mean() if "capacidad_minima" in df_emp.columns else float("nan")
+        frec_pico = df_emp["frecuencia_de_despacho_hora_pico"].mean() if "frecuencia_de_despacho_hora_pico" in df_emp.columns else float("nan")
+        frec_valle = df_emp["frecuencia_despacho_hora_valle"].mean() if "frecuencia_despacho_hora_valle" in df_emp.columns else float("nan")
 
-    # --------- Estadísticas numéricas ---------
-    cant = len(df_emp)
-    cap_max = df_emp["capacidad_maxima"].mean()
-    cap_min = df_emp["capacidad_minima"].mean()
-    frec_pico = df_emp["frecuencia_de_despacho_hora_pico"].mean()
-    frec_valle = df_emp["frecuencia_despacho_hora_valle"].mean()
-
-    texto = (
-        f"• Vehículos registrados: {cant}\n\n"
-        f"• Capacidad Máxima promedio: {round(cap_max, 2)}\n\n"
-        f"• Capacidad Mínima promedio: {round(cap_min, 2)}\n\n"
-        f"• Frecuencia hora pico promedio: {round(frec_pico, 2)}\n\n"
-        f"• Frecuencia hora valle promedio: {round(frec_valle, 2)}"
-    )
+        texto = (
+            f"• Vehículos registrados: {cant}\n\n"
+            f"• Capacidad Máxima promedio: {round(cap_max, 2) if not pd.isna(cap_max) else 'N/A'}\n\n"
+            f"• Capacidad Mínima promedio: {round(cap_min, 2) if not pd.isna(cap_min) else 'N/A'}\n\n"
+            f"• Frecuencia hora pico promedio: {round(frec_pico, 2) if not pd.isna(frec_pico) else 'N/A'}\n\n"
+            f"• Frecuencia hora valle promedio: {round(frec_valle, 2) if not pd.isna(frec_valle) else 'N/A'}"
+        )
+    except Exception as e:
+        print("debug: error calculando estadisticas:", e)
+        texto = "No fue posible calcular estadísticas numéricas."
 
     frame_info = tk.Frame(frame_scroll, bg="white", bd=1, relief="solid")
     frame_info.pack(padx=30, pady=20, fill="x")
-
-    lbl_info = tk.Label(frame_info, text=texto, font=("Arial", 12),
-                        bg="white", justify="left", anchor="w")
+    lbl_info = tk.Label(frame_info, text=texto, font=("Arial", 12), bg="white", justify="left", anchor="w")
     lbl_info.pack(padx=20, pady=20)
 
-    # --------- Botón volver ---------
-    btn_volver = tk.Button(
-        frame_scroll,
-        text="Volver al menú principal",
-        font=("Arial", 12),
-        width=25,
-        height=2,
-        bg="#D9EAF7",
-        command=lambda: cerrar_y_volver(ven_emp)
-    )
+    #boton volver
+    btn_volver = tk.Button(frame_scroll, text="Volver al menú principal", font=("Arial", 12), width=25, height=2, bg="#D9EAF7",
+                          command=lambda: cerrar_y_volver(ven_emp))
     btn_volver.pack(pady=20)
+
+    #si algo sale mal y la ventana queda oculta, asegurar que la principal se revele al cerrar esta
+    def al_cerrar():
+        try:
+            ven_emp.destroy()
+        finally:
+            try:
+                ventana.deiconify()
+            except:
+                pass
+
+    ven_emp.protocol("WM_DELETE_WINDOW", al_cerrar)
+
 
 
 def filtrar_por_seleccion(lugar, terminal):
@@ -856,13 +888,20 @@ def estats():
     est_dec.title("Estadísticas de vehículos")
     est_dec.geometry("450x300")
 
-    empresas = ["UNITRANSA S.A.", "TRANSCOLOMBIA S.A.", "COTRANDER",
-                "LUSITANIA S.A.", "ORIENTAL DE TRANSPORTES S.A.",
-                "TRANSPORTES SAN JUAN S.A.", "TRANSPORTES PIEDECUESTA S.A."]
+    #obtener empresas únicas desde df_filtrado (empresa_limpia)
+    try:
+        empresas = sorted(df_filtrado["empresa_limpia"].dropna().astype(str).str.strip().unique().tolist())
+    except Exception:
+        empresas = []
+
+    if not empresas:
+        #fallback si por alguna razón no hay empresas extraídas
+        empresas = ["(sin datos)"]
 
     list_emp = ttk.Combobox(est_dec, values=empresas, width=35, state="disabled")
     list_emp.set("Seleccione una empresa...")
     list_emp.grid(row=2, column=0, pady=10, columnspan=2)
+
 
     btn_ver = tk.Button(est_dec, text="Ver Empresa", width=20,
                         command=lambda: invempresas(list_emp.get()))
