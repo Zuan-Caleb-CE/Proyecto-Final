@@ -149,7 +149,6 @@ def cerrar_y_volver(ventana_actual):
 
 #ver estadisticas de una empresa específica
 
-
 def invempresas(nombre):
     #cerrar solo ventanas secundarias antes de abrir la nueva
     try:
@@ -162,7 +161,7 @@ def invempresas(nombre):
     except Exception as e:
         print("debug: error cerrando toplevels previos:", e)
 
-    #si el nombre es el placeholder o vacío, avisar y no continuar
+    #verificar nombre válido
     if not nombre or nombre.strip() == "" or "Seleccione" in nombre:
         try:
             tk.messagebox.showinfo("Información", "Seleccione una empresa válida antes de ver.")
@@ -170,10 +169,9 @@ def invempresas(nombre):
             pass
         return
 
-    #normalizar nombre buscado (case-insensitive)
     nombre_buscar = nombre.strip().lower()
 
-    #filtrar de forma segura usando igualdad primero luego contains
+    #filtrado seguro
     try:
         df_emp = df_filtrado[df_filtrado["empresa_limpia"].astype(str).str.strip().str.lower() == nombre_buscar].copy()
     except Exception as e:
@@ -198,33 +196,51 @@ def invempresas(nombre):
             pass
         return
 
-    #crear ventana nueva para mostrar estadísticas
+    #crear ventana principal
     ven_emp = tk.Toplevel(ventana)
     ven_emp.title(f"Estadísticas — {nombre}")
-    ven_emp.geometry("900x800")
+    ven_emp.geometry("1000x800")
     ven_emp.config(bg="#F5F5F5")
     ven_emp.transient(ventana)
     ven_emp.grab_set()
 
-    #scrollable canvas
+    #header fijo superior
+    marco_header = ttk.Frame(ven_emp, padding=(10,6))
+    marco_header.pack(side="top", fill="x")
+
+    etiqueta_titulo = ttk.Label(marco_header, text=f"Empresa: {nombre}", font=("Arial", 16, "bold"))
+    etiqueta_titulo.pack(side="left", padx=(6,0))
+
+    btn_volver_header = tk.Button(
+        marco_header,
+        text="Volver al menú principal",
+        font=("Arial", 11),
+        width=22,
+        height=1,
+        bg="#D9EAF7",
+        command=lambda: cerrar_y_volver(ven_emp)
+    )
+    btn_volver_header.pack(side="right", padx=(0,10))
+
+    #área scrollable para gráficos y texto
     contenedor = tk.Frame(ven_emp)
     contenedor.pack(fill="both", expand=True)
+
     canvas = tk.Canvas(contenedor, bg="#F5F5F5")
     canvas.pack(side="left", fill="both", expand=True)
+
     scrollbar = tk.Scrollbar(contenedor, orient="vertical", command=canvas.yview)
     scrollbar.pack(side="right", fill="y")
     canvas.configure(yscrollcommand=scrollbar.set)
+
     frame_scroll = tk.Frame(canvas, bg="#F5F5F5")
     canvas.create_window((0, 0), window=frame_scroll, anchor="nw")
+
     def actualizar_scroll(event):
         canvas.configure(scrollregion=canvas.bbox("all"))
     frame_scroll.bind("<Configure>", actualizar_scroll)
 
-    #titulo
-    lbl_titulo = tk.Label(frame_scroll, text=f"Empresa: {nombre}", font=("Arial", 18, "bold"), bg="#F5F5F5")
-    lbl_titulo.pack(pady=12)
-
-    #función auxiliar para convertir columnas candidatas a numéricas de forma segura
+    #función auxiliar para convertir columnas numéricas
     def convertir_numericas_seguras(df_local, candidatos):
         for c in candidatos:
             if c in df_local.columns:
@@ -234,7 +250,7 @@ def invempresas(nombre):
                 df_local[c] = pd.to_numeric(df_local[c], errors="coerce")
         return df_local
 
-    #convertir columnas numéricas relevantes
+    #convertir numéricas
     candidatos_num = [
         "capacidad_maxima", "capacidad_minima",
         "frecuencia_de_despacho_hora_pico", "frecuencia_de_despacho_pico", "frecuencia_pico",
@@ -243,187 +259,174 @@ def invempresas(nombre):
     ]
     df_emp = convertir_numericas_seguras(df_emp, candidatos_num)
 
-    #convertir longitudes también
     posibles_long = ["long_km", "longitud", "longitud_km", "long_km"]
     df_emp = convertir_numericas_seguras(df_emp, posibles_long)
 
-    #--------- grafico 1: barras por terminal (ya existente) ----------
-    try:
-        conteo_term = df_emp["terminal"].value_counts()
-        fig1, ax1 = plt.subplots(figsize=(7, 3.5), dpi=100)
-        conteo_term.plot(kind="bar", ax=ax1)
-        ax1.set_title(f"Frecuencia de terminales — {nombre}", fontsize=10)
-        ax1.set_xlabel("Terminal")
-        ax1.set_ylabel("Cantidad")
-        plt.setp(ax1.get_xticklabels(), rotation=45, ha="right")
-        ax1.grid(alpha=0.3)
+    #marco rejilla 2x2
+    marco_graficos = ttk.Frame(frame_scroll)
+    marco_graficos.pack(padx=10, pady=8, fill="both", expand=False)
 
-        frame_graf1 = tk.Frame(frame_scroll, bg="#F5F5F5")
-        frame_graf1.pack(pady=8, fill="x")
-        canvas_graf1 = FigureCanvasTkAgg(fig1, master=frame_graf1)
-        canvas_graf1.draw()
-        canvas_graf1.get_tk_widget().pack()
-    except Exception as e:
-        print("debug: error creando grafica terminales:", e)
+    marco_graficos.columnconfigure(0, weight=1)
+    marco_graficos.columnconfigure(1, weight=1)
+    marco_graficos.rowconfigure(0, weight=1)
+    marco_graficos.rowconfigure(1, weight=1)
+
+    #función para dibujar figuras
+    def render_fig_en_frame(fig, parent_frame):
         try:
-            tk.messagebox.showwarning("Advertencia", f"No se pudo generar la gráfica de terminales: {e}")
-        except:
-            pass
+            canvas_fig = FigureCanvasTkAgg(fig, master=parent_frame)
+            canvas_fig.draw()
+            widget = canvas_fig.get_tk_widget()
+            widget.pack(fill="both", expand=True)
+        except Exception as e:
+            print("debug: error renderizando figura en frame:", e)
 
-    #--------- grafico 2: scatter (elige dos columnas numéricas con más datos) ----------
+    #--------- GRAFICO A: terminales (0,0) ----------
     try:
+        frame_a = ttk.Frame(marco_graficos, padding=6)
+        frame_a.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+
+        if "terminal" in df_emp.columns and not df_emp["terminal"].dropna().empty:
+            conteo_term = df_emp["terminal"].value_counts()
+            fig_a, ax_a = plt.subplots(figsize=(3.5, 3), dpi=100)
+            conteo_term.plot(kind="bar", ax=ax_a)
+            ax_a.set_title("Frecuencia de terminales", fontsize=9)
+            ax_a.set_xlabel("")
+            ax_a.set_ylabel("Cantidad")
+            plt.setp(ax_a.get_xticklabels(), rotation=35, ha="right", fontsize=7)
+            ax_a.grid(alpha=0.25)
+            fig_a.tight_layout()
+            render_fig_en_frame(fig_a, frame_a)
+        else:
+            ttk.Label(frame_a, text="sin datos de terminales", background="#F5F5F5").pack(expand=True, fill="both")
+    except Exception as e:
+        print("debug: error grafico terminales:", e)
+
+    #--------- GRAFICO B: scatter (0,1) ----------
+    try:
+        frame_b = ttk.Frame(marco_graficos, padding=6)
+        frame_b.grid(row=0, column=1, sticky="nsew", padx=6, pady=6)
+
         num_cols = df_emp.select_dtypes(include=[np.number]).columns.tolist()
-        #quitar columnas triviales como 'id' si están presentes
         num_cols = [c for c in num_cols if c not in ("id",)]
+
         if len(num_cols) >= 2:
-            #elegir las dos con mayor conteo de no nulos
             conteos = {c: df_emp[c].count() for c in num_cols}
             cols_orden = sorted(conteos, key=lambda k: conteos[k], reverse=True)
             xcol, ycol = cols_orden[0], cols_orden[1]
+
             df_sc = df_emp[[xcol, ycol]].dropna()
             if len(df_sc) > 1:
                 x = df_sc[xcol].values
                 y = df_sc[ycol].values
-                m, b = np.polyfit(x, y, 1)
-                y_fit = m * x + b
 
-                fig2, ax2 = plt.subplots(figsize=(6.8, 3.5), dpi=100)
-                ax2.scatter(x, y, alpha=0.7)
-                ax2.plot(x, y_fit, color='orange', linewidth=2)
-                ax2.set_xlabel(xcol)
-                ax2.set_ylabel(ycol)
-                ax2.set_title(f"Dispersión: {ycol} vs {xcol} (línea tendencia)", fontsize=10)
-                ax2.grid(True, linestyle='--', alpha=0.3)
-                frame_graf2 = tk.Frame(frame_scroll, bg="#F5F5F5")
-                frame_graf2.pack(pady=8, fill="x")
-                canvas_graf2 = FigureCanvasTkAgg(fig2, master=frame_graf2)
-                canvas_graf2.draw()
-                canvas_graf2.get_tk_widget().pack()
+                try:
+                    m, b = np.polyfit(x, y, 1)
+                    y_fit = m * x + b
+                except Exception:
+                    y_fit = None
+
+                fig_b, ax_b = plt.subplots(figsize=(3.5, 3), dpi=100)
+                ax_b.scatter(x, y, alpha=0.7, s=20)
+                if y_fit is not None:
+                    ax_b.plot(x, y_fit, color='orange', linewidth=1.2)
+
+                ax_b.set_xlabel(xcol, fontsize=8)
+                ax_b.set_ylabel(ycol, fontsize=8)
+                ax_b.set_title(f"Dispersión: {ycol} vs {xcol}", fontsize=9)
+                ax_b.grid(alpha=0.25, linestyle='--')
+                fig_b.tight_layout()
+                render_fig_en_frame(fig_b, frame_b)
             else:
-                print("debug: no hay suficientes puntos para scatter")
+                ttk.Label(frame_b, text="no hay suficientes puntos para scatter", background="#F5F5F5").pack(expand=True, fill="both")
         else:
-            print("debug: menos de 2 columnas numéricas para scatter")
+            ttk.Label(frame_b, text="menos de 2 columnas numéricas", background="#F5F5F5").pack(expand=True, fill="both")
     except Exception as e:
-        print("debug: error creando scatter:", e)
-        try:
-            tk.messagebox.showwarning("Advertencia", f"No se pudo generar el scatter: {e}")
-        except:
-            pass
+        print("debug: error grafico scatter:", e)
 
-    #--------- grafico 3: barras media ± desviación para Pico vs Valle ----------
+    #--------- GRAFICO C: pico vs valle (1,0) ----------
     try:
-        #buscar la columna existente para pico y valle entre varias opciones
-        def encontrar_col(candidatos):
-            for c in candidatos:
-                if c in df_emp.columns:
-                    return c
-            return None
+        frame_c = ttk.Frame(marco_graficos, padding=6)
+        frame_c.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
 
-        pico_col = encontrar_col(["frecuencia_de_despacho_hora_pico", "frecuencia_de_despacho_pico", "frecuencia_pico", "frecuencia_de_pico"])
-        valle_col = encontrar_col(["frecuencia_despacho_hora_valle", "frecuencia_de_despacho_hora_valle", "frecuencia_valle", "frecuencia_de_valle"])
-
-        if pico_col or valle_col:
-            valores_pico = df_emp[pico_col].dropna() if pico_col in df_emp.columns else pd.Series(dtype=float)
-            
-            #the above line is messy — fix: compute properly
-        #recompute correctly
-    except Exception:
-        pass
-
-    #re-implementar pico/valle correctamente en bloque separado (evitar confusiones)
-    try:
-        pico_col = None
-        valle_col = None
         candidatos_pico = ["frecuencia_de_despacho_hora_pico", "frecuencia_de_despacho_pico", "frecuencia_pico", "frecuencia_de_pico"]
         candidatos_valle = ["frecuencia_despacho_hora_valle", "frecuencia_de_despacho_hora_valle", "frecuencia_valle", "frecuencia_de_valle"]
 
-        for c in candidatos_pico:
-            if c in df_emp.columns:
-                pico_col = c
-                break
-        for c in candidatos_valle:
-            if c in df_emp.columns:
-                valle_col = c
-                break
+        pico_col = next((c for c in candidatos_pico if c in df_emp.columns), None)
+        valle_col = next((c for c in candidatos_valle if c in df_emp.columns), None)
 
         if pico_col or valle_col:
-            valores_pico = df_emp[pico_col].dropna() if pico_col in df_emp.columns else pd.Series(dtype=float)
-            valores_valle = df_emp[valle_col].dropna() if valle_col in df_emp.columns else pd.Series(dtype=float)
+            valores_pico = df_emp[pico_col].dropna() if pico_col else pd.Series(dtype=float)
+            valores_valle = df_emp[valle_col].dropna() if valle_col else pd.Series(dtype=float)
 
-            medias = [valores_pico.mean() if not valores_pico.empty else np.nan,
-                      valores_valle.mean() if not valores_valle.empty else np.nan]
-            desv = [valores_pico.std() if not valores_pico.empty else np.nan,
-                   valores_valle.std() if not valores_valle.empty else np.nan]
+            medias = [
+                valores_pico.mean() if not valores_pico.empty else np.nan,
+                valores_valle.mean() if not valores_valle.empty else np.nan
+            ]
+            desv = [
+                valores_pico.std() if not valores_pico.empty else np.nan,
+                valores_valle.std() if not valores_valle.empty else np.nan
+            ]
 
-            etiquetas = ['Pico', 'Valle']
-            x = np.arange(len(etiquetas))
-            ancho = 0.6
+            if not all(np.isnan(medias)):
+                medias_plot = [0 if np.isnan(m) else m for m in medias]
+                desv_plot = [0 if np.isnan(d) else d for d in desv]
 
-            fig3, ax3 = plt.subplots(figsize=(6.8, 3.5), dpi=100)
-            ax3.bar(x, medias, width=ancho, yerr=desv, capsize=6)
-            ax3.set_xticks(x)
-            ax3.set_xticklabels(etiquetas)
-            ax3.set_ylabel('Frecuencia (media)')
-            ax3.set_title('Media ± desviación estándar: frecuencia despacho (Pico vs Valle)')
-            ax3.grid(axis='y', linestyle='--', alpha=0.3)
-            frame_graf3 = tk.Frame(frame_scroll, bg="#F5F5F5")
-            frame_graf3.pack(pady=8, fill="x")
-            canvas_graf3 = FigureCanvasTkAgg(fig3, master=frame_graf3)
-            canvas_graf3.draw()
-            canvas_graf3.get_tk_widget().pack()
+                etiquetas = ['Pico', 'Valle']
+                x = np.arange(len(etiquetas))
+
+                fig_c, ax_c = plt.subplots(figsize=(3.5, 3), dpi=100)
+                ax_c.bar(x, medias_plot, width=0.6, yerr=desv_plot, capsize=5)
+                ax_c.set_xticks(x)
+                ax_c.set_xticklabels(etiquetas, fontsize=8)
+                ax_c.set_ylabel('Frecuencia (media)', fontsize=8)
+                ax_c.set_title('Media ± desviación: Pico vs Valle', fontsize=9)
+                ax_c.grid(axis='y', alpha=0.25, linestyle='--')
+                fig_c.tight_layout()
+                render_fig_en_frame(fig_c, frame_c)
+            else:
+                ttk.Label(frame_c, text="no hay datos suficientes", background="#F5F5F5").pack(expand=True, fill="both")
         else:
-            print("debug: no se encontraron columnas para pico/valle en esta empresa")
+            ttk.Label(frame_c, text="no se encontraron columnas pico/valle", background="#F5F5F5").pack(expand=True, fill="both")
     except Exception as e:
-        print("debug: error creando grafico pico/valle:", e)
-        try:
-            tk.messagebox.showwarning("Advertencia", f"No se pudo generar el gráfico Pico/Valle: {e}")
-        except:
-            pass
+        print("debug: error grafico pico/valle:", e)
 
-    #--------- grafico 4: distribución de longitudes (barras por bins) ----------
+    #--------- GRAFICO D: longitudes (1,1) ----------
     try:
-        #buscar columna de longitudes
-        long_col = None
-        for c in posibles_long:
-            if c in df_emp.columns:
-                long_col = c
-                break
+        frame_d = ttk.Frame(marco_graficos, padding=6)
+        frame_d.grid(row=1, column=1, sticky="nsew", padx=6, pady=6)
+
+        long_col = next((c for c in posibles_long if c in df_emp.columns), None)
         if long_col:
             longitudes = pd.to_numeric(df_emp[long_col].dropna(), errors="coerce")
             if not longitudes.empty:
-                bins = 10
+                bins = 8
                 hist, bin_edges = np.histogram(longitudes, bins=bins)
                 bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
 
-                fig4, ax4 = plt.subplots(figsize=(7, 3.5), dpi=100)
-                ax4.bar(bin_centers, hist, width=(bin_edges[1]-bin_edges[0]) * 0.9)
-                ax4.set_xlabel("Longitud de la ruta (km)")
-                ax4.set_ylabel("Frecuencia")
-                ax4.set_title("Distribución de la longitud de las rutas (km)")
-                ax4.grid(alpha=0.3)
-                frame_graf4 = tk.Frame(frame_scroll, bg="#F5F5F5")
-                frame_graf4.pack(pady=8, fill="x")
-                canvas_graf4 = FigureCanvasTkAgg(fig4, master=frame_graf4)
-                canvas_graf4.draw()
-                canvas_graf4.get_tk_widget().pack()
+                fig_d, ax_d = plt.subplots(figsize=(3.5, 3), dpi=100)
+                ax_d.bar(bin_centers, hist, width=(bin_edges[1]-bin_edges[0])*0.9)
+                ax_d.set_xlabel("Longitud (km)", fontsize=8)
+                ax_d.set_ylabel("Frecuencia", fontsize=8)
+                ax_d.set_title("Distribución longitudes (km)", fontsize=9)
+                ax_d.grid(alpha=0.25)
+                fig_d.tight_layout()
+                render_fig_en_frame(fig_d, frame_d)
             else:
-                print("debug: no hay datos de longitudes para esta empresa")
+                ttk.Label(frame_d, text="sin datos de longitudes", background="#F5F5F5").pack(expand=True, fill="both")
         else:
-            print("debug: no existe columna de longitudes en df_emp")
+            ttk.Label(frame_d, text="columna longitudes no encontrada", background="#F5F5F5").pack(expand=True, fill="both")
     except Exception as e:
-        print("debug: error creando hist longitudes:", e)
-        try:
-            tk.messagebox.showwarning("Advertencia", f"No se pudo generar la distribución de longitudes: {e}")
-        except:
-            pass
+        print("debug: error grafico longitudes:", e)
 
-    #--------- resumen estadístico en texto ----------
+    #--------- resumen ----------
     try:
         cant = len(df_emp)
         cap_max = df_emp["capacidad_maxima"].mean() if "capacidad_maxima" in df_emp.columns else float("nan")
         cap_min = df_emp["capacidad_minima"].mean() if "capacidad_minima" in df_emp.columns else float("nan")
         frec_pico = df_emp[pico_col].mean() if pico_col in df_emp.columns else float("nan")
         frec_valle = df_emp[valle_col].mean() if valle_col in df_emp.columns else float("nan")
+
         texto = (
             f"• Vehículos registrados: {cant}\n\n"
             f"• Capacidad máxima promedio: {round(cap_max,2) if not pd.isna(cap_max) else 'N/A'}\n\n"
@@ -433,19 +436,15 @@ def invempresas(nombre):
         )
     except Exception as e:
         print("debug: error calculando estadisticas:", e)
-        texto = "No fue posible calcular estadísticas numéricas."
+        texto = "No fue posible calcular estadísticas."
 
     frame_info = tk.Frame(frame_scroll, bg="white", bd=1, relief="solid")
-    frame_info.pack(padx=30, pady=12, fill="x")
-    lbl_info = tk.Label(frame_info, text=texto, font=("Arial", 12), bg="white", justify="left", anchor="w")
-    lbl_info.pack(padx=20, pady=12)
+    frame_info.pack(padx=20, pady=10, fill="x")
 
-    #botón volver claro y visible
-    btn_volver = tk.Button(frame_scroll, text="Volver al menú principal", font=("Arial", 12), width=25, height=2, bg="#D9EAF7",
-                          command=lambda: cerrar_y_volver(ven_emp))
-    btn_volver.pack(pady=14)
+    lbl_info = tk.Label(frame_info, text=texto, font=("Arial", 12), bg="white", justify="left")
+    lbl_info.pack(padx=12, pady=12)
 
-    #si algo sale mal y la ventana queda oculta, asegurar que la principal se revele al cerrar esta
+    #acción al cerrar
     def al_cerrar():
         try:
             ven_emp.destroy()
@@ -456,9 +455,6 @@ def invempresas(nombre):
                 pass
 
     ven_emp.protocol("WM_DELETE_WINDOW", al_cerrar)
-
-
-
 
 
 ########################################################################################
