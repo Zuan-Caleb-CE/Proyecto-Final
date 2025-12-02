@@ -484,6 +484,7 @@ def visualizacion_rutas():
 # -------------------------------------------------------------
 # agregar vehiculo - ventana emergente 4
 # -------------------------------------------------------------
+
 def ventana_emergente_4(padre):
     #crear ventana toplevel
     ventana = tk.Toplevel(padre)
@@ -527,17 +528,8 @@ def ventana_emergente_4(padre):
     if not horas_ultimo_despacho:
         horas_ultimo_despacho = [f"{h:02d}:00" for h in range(0, 24)]
 
-    opciones_clase = None
-    posibles_columnas_clase = ["clase", "tipo", "servicio", "tipo_servicio", "clase_vehiculo"]
-    for columna in posibles_columnas_clase:
-        if columna in df_filtrado.columns:
-            try:
-                opciones_clase = sorted(df_filtrado[columna].dropna().astype(str).str.strip().unique().tolist())
-                break
-            except Exception:
-                opciones_clase = None
-    if not opciones_clase:
-        opciones_clase = ["Clase 1", "Clase 2"]
+    #dividir clases en dos categorías fijas: buseta y microbus
+    opciones_clase = ["buseta", "microbus"]
 
     #estilos
     estilo = ttk.Style(ventana)
@@ -662,7 +654,7 @@ def ventana_emergente_4(padre):
             "hora_primer_despacho": hora_primer_var.get().strip(),
             "hora_ultimo_despacho": hora_ultimo_var.get().strip(),
             "long_km": longitud_var.get().strip(),
-            "clase": clase_var.get().strip(),
+            "clase": clase_var.get().strip(),  #será 'buseta' o 'microbus'
             "ruta": entrada_texto.get().strip(),
         }
 
@@ -680,7 +672,7 @@ def ventana_emergente_4(padre):
             #declarar globals que vamos a modificar
             global df, df_filtrado, terminales, lugares
 
-            #calcular nuevo codigo para el indice 'codigo'
+            #calcular nuevo codigo para el indice 'codigo' (índice del DataFrame)
             try:
                 idx_numerico = pd.to_numeric(df.index.astype(str), errors="coerce")
                 max_idx = int(idx_numerico.max()) if not np.isnan(idx_numerico.max()) else None
@@ -691,12 +683,20 @@ def ventana_emergente_4(padre):
             except Exception:
                 nuevo_codigo = df.reset_index().shape[0] + 1
 
+            #calcular nuevo id (columna 'id')
+            try:
+                if "id" in df.columns:
+                    max_id = int(pd.to_numeric(df["id"], errors="coerce").max())
+                    nuevo_id = max_id + 1
+                else:
+                    nuevo_id = 1
+            except Exception:
+                nuevo_id = 1
+
             #construir fila nueva con todas las columnas existentes en df
             fila = {}
             for col in df.columns:
-                #rellenar con valores si el nombre de columna coincide con nuestras keys
                 if col in datos:
-                    #intentar convertir numericos simples
                     val = datos[col]
                     if col in ("capacidad_minima", "capacidad_maxima", "long_km",
                                "frecuencia_de_despacho_hora_pico", "frecuencia_despacho_hora_valle"):
@@ -710,24 +710,47 @@ def ventana_emergente_4(padre):
                 else:
                     fila[col] = np.nan
 
-            #si 'ruta' no existe en columnas, intentar usar 'recorrido' o 'ruta'
-            if "ruta" not in df.columns and "recorrido" in df.columns:
-                fila["recorrido"] = datos.get("ruta", "")
+            #asegurar que existan tanto 'ruta' como 'recorrido' si corresponden
+            if "ruta" in df.columns:
+                fila["ruta"] = datos.get("ruta", fila.get("ruta", ""))
+            if "recorrido" in df.columns:
+                fila["recorrido"] = datos.get("ruta", fila.get("recorrido", ""))
+
+            #asegurar columna 'id' en la fila y en el df
+            fila["id"] = nuevo_id
+            if "id" not in df.columns:
+                df["id"] = np.nan
 
             #asegurar nombre del índice
             df.index.name = "codigo"
-            #añadir la fila
+            #añadir la fila con índice nuevo_codigo
             df.loc[nuevo_codigo] = fila
 
-            #actualizar df_filtrado (intento simple: agregar la misma fila)
+            #actualizar df_filtrado: si no existe la fila la añadimos; si existe la reemplazamos
             try:
-                df_filtrado.loc[nuevo_codigo] = fila
-                #actualizar columna empresa_limpia si existe
-                if "empresa_limpia" in df_filtrado.columns:
+                if nuevo_codigo in df_filtrado.index:
+                    df_filtrado.loc[nuevo_codigo] = fila
+                else:
+                    #si df_filtrado no contiene algunas columnas, lo intentamos añadir de forma segura
+                    df_filtrado = df_filtrado.reindex(df.index)  #sincroniza índices y columnas mínimas
+                    df_filtrado.loc[nuevo_codigo] = fila
+                #actualizar empresa_limpia si aplica
+                if "empresa_limpia" in df_filtrado.columns and "empresa" in df_filtrado.columns:
                     df_filtrado["empresa_limpia"] = df_filtrado["empresa"].astype(str).str.replace(
                         "OPERACIÓN AUTORIZADA A ", "", regex=False).str.strip()
             except Exception as e:
                 print("debug: no se pudo agregar a df_filtrado directamente:", e)
+                #en caso crítico, rehacer df_filtrado desde df (preservando fillna básico)
+                try:
+                    df_filtrado = df.fillna({"empresa":"BUSETAS AUTONOMA"
+                                             ,"capacidad_minima" : df["capacidad_minima"].mean(),
+                                             'capacidad_maxima':df["capacidad_maxima"].mean(),
+                                            'frecuencia_de_despacho_hora_pico': "00",
+                                            'hora_primer_despacho': "05:00:00 a.m.",
+                                            'hora_ultimo_despacho': "08:30:00 p.m",})
+                    df_filtrado["empresa_limpia"] = df_filtrado["empresa"].str.replace("OPERACIÓN AUTORIZADA A ", "", regex=False)
+                except Exception as e2:
+                    print("debug: error recreando df_filtrado:", e2)
 
             #guardar el df actualizado al CSV original
             try:
@@ -744,13 +767,22 @@ def ventana_emergente_4(padre):
             try:
                 terminales = sorted(set(df["terminal"].dropna().astype(str).str.strip()))
             except:
-                terminales = sorted(set(df_filtrado["terminal"].dropna().astype(str).str.strip())) if "terminal" in df_filtrado.columns else terminales
+                try:
+                    terminales = sorted(set(df_filtrado["terminal"].dropna().astype(str).str.strip()))
+                except:
+                    terminales = terminales
 
             try:
-                rutas = df["ruta"].dropna().unique().tolist() if "ruta" in df.columns else []
+                if "ruta" in df.columns:
+                    rutas = df["ruta"].dropna().unique().tolist()
+                elif "recorrido" in df.columns:
+                    rutas = df["recorrido"].dropna().unique().tolist()
+                else:
+                    rutas = []
+
                 lugares_separados = set()
-                for ruta in rutas:
-                    lugares_separados.update([lugar.strip() for lugar in str(ruta).split("-")])
+                for r in rutas:
+                    lugares_separados.update([lugar.strip() for lugar in str(r).split("-") if lugar and lugar.strip()])
                 lugares = sorted(lugares_separados)
             except:
                 pass
@@ -776,6 +808,8 @@ def ventana_emergente_4(padre):
     marco_principal.columnconfigure(1, weight=1)
     marco_izq.columnconfigure(0, weight=1)
     marco_der.columnconfigure(0, weight=1)
+
+
 
 #############################################################################
 ##################################################################
