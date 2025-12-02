@@ -11,12 +11,39 @@ import unicodedata
 df = pd.read_csv("8._RUTAS_TRANSPORTE_URBANO_20251011.csv", index_col="codigo")
 print(df.columns)
 
-df_filtrado = df.fillna({"empresa":"BUSETAS AUTONOMA"
-                         ,"capacidad_minima" : df["capacidad_minima"].mean(),
-                         'capacidad_maxima':df["capacidad_maxima"].mean(),
-                        'frecuencia_de_despacho_hora_pico': "00",
-                        'hora_primer_despacho': "05:00:00 a.m.",
-                        'hora_ultimo_despacho': "08:30:00 p.m",})
+#normalizar y convertir a numérico las columnas que deben ser números
+cols_numericas = [
+    "capacidad_minima",
+    "capacidad_maxima",
+    "frecuencia_de_despacho_hora_pico",
+    "frecuencia_despacho_hora_valle",
+    "long_km"
+]
+for col in cols_numericas:
+    if col in df.columns:
+        #convertir a string, cambiar comas por puntos y extraer el primer número que encuentre
+        df[col] = df[col].astype(str).str.replace(",", ".", regex=False)
+        df[col] = df[col].str.extract(r'([-+]?\d*\.?\d+)')[0]
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+#crear diccionario de fillna usando medias numéricas limpias cuando existan
+llenar = {"empresa": "BUSETAS AUTONOMA",
+          "hora_primer_despacho": "05:00:00 a.m.",
+          "hora_ultimo_despacho": "08:30:00 p.m"}
+
+if "capacidad_minima" in df.columns:
+    llenar["capacidad_minima"] = df["capacidad_minima"].mean()
+if "capacidad_maxima" in df.columns:
+    llenar["capacidad_maxima"] = df["capacidad_maxima"].mean()
+if "frecuencia_de_despacho_hora_pico" in df.columns:
+    llenar["frecuencia_de_despacho_hora_pico"] = df["frecuencia_de_despacho_hora_pico"].mean()
+#nota: frecuencia_valle no está en la clave exacta usada para fillna en tu archivo original;
+#si existe en df se puede añadir igual que arriba:
+if "frecuencia_despacho_hora_valle" in df.columns:
+    llenar["frecuencia_despacho_hora_valle"] = df["frecuencia_despacho_hora_valle"].mean()
+
+df_filtrado = df.fillna(llenar)
+
 
 df_filtrado["empresa_limpia"] = df_filtrado["empresa"].str.replace("OPERACIÓN AUTORIZADA A ", "", regex=False)
 
@@ -811,9 +838,13 @@ def ventana_emergente_4(padre):
 
 
 
+
+
 #############################################################################
 ##################################################################
 ###################################################
+
+
 
 # -------------------------------------------------------------------
 # ----- VENTANA DE SELECCION DE ESTADISTICAS ------------------------
@@ -1193,7 +1224,9 @@ print("\nDataFrame final (longitud menor a 30 km):")
 print(df_long)
 
 
-df = pd.read_csv("8._RUTAS_TRANSPORTE_URBANO_20251011.csv", index_col="codigo")
+#usar df ya cargado y normalizado arriba
+DF = df.copy()
+
 df['long_km'] = (df['long_km'].astype(str) #lo convierte a string para que sea mas facil de trabajar
                  
                  .str.replace(',', '.', regex=False)          #comas -> puntos
