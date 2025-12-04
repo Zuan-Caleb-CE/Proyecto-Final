@@ -1,119 +1,114 @@
-import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np 
-import tkinter as tk
-from tkinter import ttk
-from PIL import Image, ImageTk
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import re
-import unicodedata
-import os
-import re
-import unicodedata
-import platform
-import threading
-import threading
+import pandas as pd #importa la libreria pandas para manejo de datos en tablas
+import matplotlib.pyplot as plt #importa matplotlib para graficar
+import numpy as np #importa numpy para operaciones matematicas
+import tkinter as tk #importa tkinter para crear interfaces graficas
+from tkinter import ttk #importa ttk para widgets con estilos modernos en tkinter
+from PIL import Image, ImageTk #importa PIL para manejar imagenes en tkinter
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg #permite mostrar graficas matplotlib en tkinter
+import re #importa re para expresiones regulares
+import unicodedata #importa unicodedata para normalizar texto y quitar acentos
+import os #importa os para manejo de rutas de archivos
+import unicodedata #importa unicodedata de nuevo (ya estaba arriba, pero no afecta)
+import platform #importa platform para detectar el sistema operativo
+import threading #importa threading para ejecutar tareas en segundo plano
 
 #sonidos y compatibilidad (winsound en windows, si no disponible no hace nada)
 try:
-    import winsound
+    import winsound #intenta importar winsound para reproducir sonidos en windows
 except Exception:
-    winsound = None
+    winsound = None #si falla, asigna None para evitar errores
 
 #helper para reproducir sonidos de interfaz (no falla si winsound no existe)
-def reproducir_sonido(nombre):
+def reproducir_sonido(nombre): #funcion para reproducir sonidos segun el nombre
     #nombre: 'abrir','click','ok','error'
     try:
-        if winsound and platform.system()=="Windows":
+        if winsound and platform.system()=="Windows": #si winsound existe y es windows
             if nombre == "abrir":
-                winsound.MessageBeep(winsound.MB_ICONASTERISK)
+                winsound.MessageBeep(winsound.MB_ICONASTERISK) #sonido de abrir
             elif nombre == "click":
-                winsound.MessageBeep(winsound.MB_OK)
+                winsound.MessageBeep(winsound.MB_OK) #sonido de click
             elif nombre == "ok":
-                winsound.MessageBeep(winsound.MB_OK)
+                winsound.MessageBeep(winsound.MB_OK) #sonido de ok
             elif nombre == "error":
-                winsound.MessageBeep(winsound.MB_ICONHAND)
+                winsound.MessageBeep(winsound.MB_ICONHAND) #sonido de error
             else:
-                winsound.MessageBeep()
+                winsound.MessageBeep() #sonido generico
         else:
             #fallback cross-platform: si existe una ventana global, usar bell
             try:
-                ventana.bell()
+                ventana.bell() #intenta hacer beep con la ventana principal
             except Exception:
-                pass
+                pass #si falla, no hace nada
     except Exception:
-        pass
+        pass #si ocurre cualquier error, no hace nada
 
 #mostrar un cargador modal simple con progressbar indeterminada
-def mostrar_cargador(padre, texto="Cargando…"):
+def mostrar_cargador(padre, texto="Cargando…"): #muestra ventana de carga con barra de progreso
     #crea un Toplevel pequeño y devuelve el objeto para cerrarlo luego
-    cargador = tk.Toplevel(padre)
-    cargador.transient(padre)
-    cargador.grab_set()
-    cargador.title("")
-    cargador.geometry("260x80")
+    cargador = tk.Toplevel(padre) #crea ventana hija
+    cargador.transient(padre) #la hace modal
+    cargador.grab_set() #bloquea interaccion con otras ventanas
+    cargador.title("") #sin titulo
+    cargador.geometry("260x80") #tamaño fijo
     try:
-        padre.update_idletasks()
-        px = padre.winfo_rootx()
-        py = padre.winfo_rooty()
-        pw = padre.winfo_width()
-        ph = padre.winfo_height()
-        cargador.geometry(f"+{px + max(10, pw//2 - 130)}+{py + max(10, ph//2 - 40)}")
+        padre.update_idletasks() #actualiza la ventana padre
+        px = padre.winfo_rootx() #obtiene posicion x de la ventana padre
+        py = padre.winfo_rooty() #obtiene posicion y de la ventana padre
+        pw = padre.winfo_width() #obtiene ancho de la ventana padre
+        ph = padre.winfo_height() #obtiene alto de la ventana padre
+        cargador.geometry(f"+{px + max(10, pw//2 - 130)}+{py + max(10, ph//2 - 40)}") #centra el cargador sobre la ventana padre
     except Exception:
-        pass
-    cargador.resizable(False, False)
-    frame = ttk.Frame(cargador, padding=(8,8))
-    frame.pack(fill="both", expand=True)
-    lbl = ttk.Label(frame, text=texto)
-    lbl.pack(pady=(2,6))
-    barra = ttk.Progressbar(frame, mode="indeterminate", length=220)
-    barra.pack()
-    barra.start(10)
-    cargador.update_idletasks()
-    return cargador
+        pass #si falla, no centra
+    cargador.resizable(False, False) #no permite cambiar tamaño
+    frame = ttk.Frame(cargador, padding=(8,8)) #crea frame con padding
+    frame.pack(fill="both", expand=True) #lo expande en la ventana
+    lbl = ttk.Label(frame, text=texto) #label con texto de carga
+    lbl.pack(pady=(2,6)) #espaciado vertical
+    barra = ttk.Progressbar(frame, mode="indeterminate", length=220) #barra de progreso indeterminada
+    barra.pack() #muestra la barra
+    barra.start(10) #inicia animacion de la barra
+    cargador.update_idletasks() #actualiza la ventana
+    return cargador #devuelve el objeto para cerrarlo luego
 
 #detener y destruir cargador
-def detener_cargador(cargador):
+def detener_cargador(cargador): #detiene y destruye la ventana de cargador
     try:
-        for child in cargador.winfo_children():
-            if isinstance(child, ttk.Progressbar):
+        for child in cargador.winfo_children(): #recorre los hijos de la ventana
+            if isinstance(child, ttk.Progressbar): #si es una barra de progreso
                 try:
-                    child.stop()
+                    child.stop() #detiene la animacion
                 except:
-                    pass
-        cargador.grab_release()
-        cargador.destroy()
+                    pass #si falla, no hace nada
+        cargador.grab_release() #libera el bloqueo modal
+        cargador.destroy() #cierra la ventana
     except Exception:
-        pass
-
+        pass #si ocurre error, no hace nada
 
 #animacionfadeentrada
-def aparecer_con_fade(ventana_toplevel, x=None, y=None, ancho=None, alto=None, pasos=10, intervalo=25):
+def aparecer_con_fade(ventana_toplevel, x=None, y=None, ancho=None, alto=None, pasos=10, intervalo=25): #animacion de desvanecimiento al mostrar ventana
     try:
         if ancho and alto and x is not None and y is not None:
-            ventana_toplevel.geometry(f"{ancho}x{alto}+{x}+{y}")
-        ventana_toplevel.attributes('-alpha', 0.0)
+            ventana_toplevel.geometry(f"{ancho}x{alto}+{x}+{y}") #posiciona la ventana
+        ventana_toplevel.attributes('-alpha', 0.0) #inicia con transparencia
         def paso(i):
             try:
-                ventana_toplevel.attributes('-alpha', i/pasos)
+                ventana_toplevel.attributes('-alpha', i/pasos) #aumenta opacidad gradualmente
                 if i < pasos:
-                    ventana_toplevel.after(intervalo, lambda: paso(i+1))
+                    ventana_toplevel.after(intervalo, lambda: paso(i+1)) #programa siguiente paso
             except:
-                pass
-        paso(0)
+                pass #si falla, no hace nada
+        paso(0) #inicia animacion
     except Exception:
-        pass
-
-
+        pass #si ocurre error, no hace nada
 
 # Resolver la ruta del CSV relativa al archivo del script (evita FileNotFoundError
 # cuando el script se ejecuta desde otro directorio de trabajo)
-csv_filename = "8._RUTAS_TRANSPORTE_URBANO_20251011.csv"
-base_dir = os.path.dirname(__file__)
-csv_path = os.path.join(base_dir, csv_filename)
-df = pd.read_csv(csv_path, index_col="codigo")
-print("Leyendo CSV en:", csv_path)
-print(df.columns)
+csv_filename = "8._RUTAS_TRANSPORTE_URBANO_20251011.csv" #nombre del archivo csv
+base_dir = os.path.dirname(__file__) #directorio donde está el script
+csv_path = os.path.join(base_dir, csv_filename) #ruta completa al csv
+df = pd.read_csv(csv_path, index_col="codigo") #lee el csv y usa 'codigo' como índice
+print("Leyendo CSV en:", csv_path) #imprime la ruta del csv
+print(df.columns) #imprime las columnas del dataframe
 
 #normalizar y convertir a numérico las columnas que deben ser números
 cols_numericas = [
@@ -122,21 +117,21 @@ cols_numericas = [
     "frecuencia_de_despacho_hora_pico",
     "frecuencia_despacho_hora_valle",
     "long_km"
-]
+] #lista de columnas que deben ser numéricas
 for col in cols_numericas:
     if col in df.columns:
         #convertir a string, cambiar comas por puntos y extraer el primer número que encuentre
-        df[col] = df[col].astype(str).str.replace(",", ".", regex=False)
-        df[col] = df[col].str.extract(r'([-+]?\d*\.?\d+)')[0]
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+        df[col] = df[col].astype(str).str.replace(",", ".", regex=False) #reemplaza comas por puntos
+        df[col] = df[col].str.extract(r'([-+]?\d*\.?\d+)')[0] #extrae el primer número decimal
+        df[col] = pd.to_numeric(df[col], errors="coerce") #convierte a número, si falla pone NaN
 
 #crear diccionario de fillna usando medias numéricas limpias cuando existan
 llenar = {"empresa": "BUSETAS AUTONOMA",
           "hora_primer_despacho": "05:00:00 a.m.",
-          "hora_ultimo_despacho": "08:30:00 p.m"}
+          "hora_ultimo_despacho": "08:30:00 p.m"} #valores por defecto para columnas vacías
 
 if "capacidad_minima" in df.columns:
-    llenar["capacidad_minima"] = df["capacidad_minima"].mean()
+    llenar["capacidad_minima"] = df["capacidad_minima"].mean() #usa la media si existe
 if "capacidad_maxima" in df.columns:
     llenar["capacidad_maxima"] = df["capacidad_maxima"].mean()
 if "frecuencia_de_despacho_hora_pico" in df.columns:
@@ -146,16 +141,15 @@ if "frecuencia_de_despacho_hora_pico" in df.columns:
 if "frecuencia_despacho_hora_valle" in df.columns:
     llenar["frecuencia_despacho_hora_valle"] = df["frecuencia_despacho_hora_valle"].mean()
 
-df_filtrado = df.fillna(llenar)
+df_filtrado = df.fillna(llenar) #rellena los valores nulos con el diccionario
 
+df_filtrado["empresa_limpia"] = df_filtrado["empresa"].str.replace("OPERACIÓN AUTORIZADA A ", "", regex=False) #crea columna empresa_limpia quitando texto fijo
 
-df_filtrado["empresa_limpia"] = df_filtrado["empresa"].str.replace("OPERACIÓN AUTORIZADA A ", "", regex=False)
+df_filtrado = df_filtrado.dropna(subset=['ruta','terminal'], how='all') #elimina filas donde ruta y terminal están vacías
 
-df_filtrado = df_filtrado.dropna(subset=['ruta','terminal'], how='all')
+print(df_filtrado.describe()) #imprime estadisticas del dataframe filtrado
 
-print(df_filtrado.describe())
-
-print(df_filtrado)
+print(df_filtrado) #imprime el dataframe filtrado completo
 
 #extrae las columnas necesarias del DataFrame
 lugares = df["ruta"].dropna().unique().tolist()  #elimina valores nulos y convierte a lista
@@ -185,7 +179,6 @@ if 'id' not in df.columns:
     print("se añadio la columna'id'")
 else:
     print("'id' ya existe")
-
 
 bloqueado = False      # Para controlar la activación/desactivación
 
@@ -696,57 +689,63 @@ def invempresas(nombre):
 ########################################################################################
 ###################################################################
 
-def filtrar_por_seleccion(lugar, terminal):
-    df_search = df_filtrado.reset_index().copy()
+def filtrar_por_seleccion(lugar, terminal): #función para filtrar el dataframe según lugar o terminal seleccionados
+    df_search = df_filtrado.reset_index().copy() #crea una copia del dataframe filtrado con el índice reiniciado
 
-    if lugar and lugar != "Seleccione un lugar...":
-        def ruta_contiene(r):
-            if not isinstance(r, str):
-                return False
-            partes = [p.strip().lower() for p in r.split("-")]
-            return lugar.strip().lower() in partes
+    if lugar and lugar != "Seleccione un lugar...": #si se seleccionó un lugar válido
+        def ruta_contiene(r): #función interna para verificar si el lugar está en la ruta
+            if not isinstance(r, str): #si la ruta no es string
+                return False #no coincide
+            partes = [p.strip().lower() for p in r.split("-")] #divide la ruta por '-' y normaliza a minúsculas
+            return lugar.strip().lower() in partes #verifica si el lugar está en las partes
 
-        filtrado = df_search[df_search["ruta"].astype(str).apply(ruta_contiene)].copy()
-        lista_resultados = filtrado.to_dict(orient="records")
-        return lista_resultados
+        filtrado = df_search[df_search["ruta"].astype(str).apply(ruta_contiene)].copy() #filtra el dataframe usando la función anterior
+        lista_resultados = filtrado.to_dict(orient="records") #convierte el resultado a una lista de diccionarios
+        return lista_resultados #devuelve la lista de resultados
 
-    elif terminal and terminal != "Seleccione un terminal...":
-        terminal_normalizado = terminal.strip().lower()
+    elif terminal and terminal != "Seleccione un terminal...": #si se seleccionó un terminal válido
+        terminal_normalizado = terminal.strip().lower() #normaliza el terminal a minúsculas y sin espacios
         filtrado = df_search[
-            df_search["terminal"].astype(str).str.strip().str.lower() == terminal_normalizado
+            df_search["terminal"].astype(str).str.strip().str.lower() == terminal_normalizado #filtra por terminal normalizado
         ].copy()
-        print("DEBUG: terminales encontrados en el filtrado:")
+        print("DEBUG: terminales encontrados en el filtrado:") #imprime los terminales encontrados para depuración
         for t in filtrado["terminal"]:
             print(f"  '{t}'")
-        lista_resultados = filtrado.to_dict(orient="records")
-        return lista_resultados
+        lista_resultados = filtrado.to_dict(orient="records") #convierte el resultado a una lista de diccionarios
+        return lista_resultados #devuelve la lista de resultados
 
-    else:
-        return []
+    else: #si no se seleccionó nada válido
+        return [] #devuelve lista vacía
+
+
+
+
+
+        
 """ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
 """ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
 """ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
-def debug_lugares_terminales_vacios():
-    print("\n--- DEBUG: Lugares vacíos tras filtrar ---")
-    vacios_lugares = []
-    for lugar in lugares:
-        res = filtrar_por_seleccion(lugar, None)
-        if not res:
-            print(f"lugar vacío: '{lugar}'")
-            vacios_lugares.append(lugar)
-    print(f"Total lugares vacíos: {len(vacios_lugares)}")
+def debug_lugares_terminales_vacios(): #función para mostrar lugares y terminales que no tienen datos al filtrar
+    print("\n--- DEBUG: Lugares vacíos tras filtrar ---") #imprime encabezado de depuración para lugares
+    vacios_lugares = [] #lista para guardar lugares vacíos
+    for lugar in lugares: #recorre todos los lugares
+        res = filtrar_por_seleccion(lugar, None) #filtra usando el lugar y sin terminal
+        if not res: #si no hay resultados
+            print(f"lugar vacío: '{lugar}'") #imprime el lugar vacío
+            vacios_lugares.append(lugar) #lo agrega a la lista de vacíos
+    print(f"Total lugares vacíos: {len(vacios_lugares)}") #imprime el total de lugares vacíos
 
-    print("\n--- DEBUG: Terminales vacíos tras filtrar ---")
-    vacios_terminales = []
-    for terminal in terminales:
-        res = filtrar_por_seleccion(None, terminal)
-        if not res:
-            print(f"terminal vacío: '{terminal}'")
-            vacios_terminales.append(terminal)
-    print(f"Total terminales vacíos: {len(vacios_terminales)}")
-    print("--- FIN DEBUG ---\n")
+    print("\n--- DEBUG: Terminales vacíos tras filtrar ---") #imprime encabezado de depuración para terminales
+    vacios_terminales = [] #lista para guardar terminales vacíos
+    for terminal in terminales: #recorre todos los terminales
+        res = filtrar_por_seleccion(None, terminal) #filtra usando el terminal y sin lugar
+        if not res: #si no hay resultados
+            print(f"terminal vacío: '{terminal}'") #imprime el terminal vacío
+            vacios_terminales.append(terminal) #lo agrega a la lista de vacíos
+    print(f"Total terminales vacíos: {len(vacios_terminales)}") #imprime el total de terminales vacíos
+    print("--- FIN DEBUG ---\n") #imprime fin de depuración
 
-debug_lugares_terminales_vacios()
+debug_lugares_terminales_vacios() #ejecuta la función de depuración al iniciar el programa
 
 """ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
 """ññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññññ"""
@@ -924,164 +923,164 @@ def visualizacion_rutas():
 # agregar vehiculo - ventana emergente 4
 # -------------------------------------------------------------
 
-def ventana_emergente_4(padre):
+def ventana_emergente_4(padre): #función para mostrar ventana emergente para agregar vehículo
     #crear ventana toplevel
-    ventana = tk.Toplevel(padre)
-    ventana.title("Ventana emergente")
-    ventana.transient(padre)
-    ventana.grab_set()
-    ventana.geometry("900x900")
+    ventana = tk.Toplevel(padre) #crea ventana secundaria
+    ventana.title("Ventana emergente") #asigna título a la ventana
+    ventana.transient(padre) #la hace modal respecto al padre
+    ventana.grab_set() #bloquea interacción con otras ventanas
+    ventana.geometry("900x900") #define tamaño de la ventana
 
     #preparar opciones desde el dataframe
     try:
         serie_empresas = df_filtrado["empresa"].dropna().astype(str).str.replace(
-            "OPERACIÓN AUTORIZADA A ", "", regex=False).str.strip()
-        opciones_empresa = sorted(serie_empresas.unique().tolist())
+            "OPERACIÓN AUTORIZADA A ", "", regex=False).str.strip() #obtiene empresas únicas, limpia texto y espacios
+        opciones_empresa = sorted(serie_empresas.unique().tolist()) #ordena empresas únicas
     except Exception as e:
-        print("debug: no se pudo obtener empresas desde df_filtrado:", e)
-        opciones_empresa = ["Empresa A", "Empresa B"]
+        print("debug: no se pudo obtener empresas desde df_filtrado:", e) #imprime error si falla
+        opciones_empresa = ["Empresa A", "Empresa B"] #opciones por defecto
 
     try:
-        if 'terminales' in globals() and terminales:
-            opciones_terminal = sorted(list(terminales))
+        if 'terminales' in globals() and terminales: #si existe la lista global terminales
+            opciones_terminal = sorted(list(terminales)) #usa la lista global
         else:
-            opciones_terminal = sorted(df_filtrado["terminal"].dropna().astype(str).str.strip().unique().tolist())
+            opciones_terminal = sorted(df_filtrado["terminal"].dropna().astype(str).str.strip().unique().tolist()) #extrae terminales únicas del dataframe
     except Exception as e:
-        print("debug: no se pudo obtener terminales:", e)
-        opciones_terminal = ["Terminal 1", "Terminal 2"]
+        print("debug: no se pudo obtener terminales:", e) #imprime error si falla
+        opciones_terminal = ["Terminal 1", "Terminal 2"] #opciones por defecto
 
-    def limpiar_lista_horas(lista):
+    def limpiar_lista_horas(lista): #función para limpiar lista de horas y eliminar nulos
         return sorted({str(x).strip() for x in lista if str(x).strip() and str(x).strip().lower() not in ("nan", "none")})
 
     try:
-        horas_primer_despacho = limpiar_lista_horas(df_filtrado["hora_primer_despacho"].dropna().astype(str).tolist())
+        horas_primer_despacho = limpiar_lista_horas(df_filtrado["hora_primer_despacho"].dropna().astype(str).tolist()) #extrae y limpia horas de primer despacho
     except Exception:
-        horas_primer_despacho = []
+        horas_primer_despacho = [] #si falla, lista vacía
     try:
-        horas_ultimo_despacho = limpiar_lista_horas(df_filtrado["hora_ultimo_despacho"].dropna().astype(str).tolist())
+        horas_ultimo_despacho = limpiar_lista_horas(df_filtrado["hora_ultimo_despacho"].dropna().astype(str).tolist()) #extrae y limpia horas de último despacho
     except Exception:
-        horas_ultimo_despacho = []
+        horas_ultimo_despacho = [] #si falla, lista vacía
 
-    if not horas_primer_despacho:
-        horas_primer_despacho = [f"{h:02d}:00" for h in range(0, 24)]
-    if not horas_ultimo_despacho:
-        horas_ultimo_despacho = [f"{h:02d}:00" for h in range(0, 24)]
+    if not horas_primer_despacho: #si no hay horas de primer despacho
+        horas_primer_despacho = [f"{h:02d}:00" for h in range(0, 24)] #genera lista de horas por defecto
+    if not horas_ultimo_despacho: #si no hay horas de último despacho
+        horas_ultimo_despacho = [f"{h:02d}:00" for h in range(0, 24)] #genera lista de horas por defecto
 
     #dividir clases en dos categorías fijas: buseta y microbus
-    opciones_clase = ["buseta", "microbus"]
+    opciones_clase = ["buseta", "microbus"] #opciones fijas para clase
 
     #estilos
-    estilo = ttk.Style(ventana)
-    estilo.theme_use('clam')
-    estilo.configure("TButton", padding=8)
-    estilo.configure("TEntry", padding=4)
-    estilo.configure("TLabel", padding=4)
+    estilo = ttk.Style(ventana) #crea objeto de estilos para la ventana
+    estilo.theme_use('clam') #usa tema 'clam'
+    estilo.configure("TButton", padding=8) #configura padding para botones
+    estilo.configure("TEntry", padding=4) #configura padding para entradas
+    estilo.configure("TLabel", padding=4) #configura padding para etiquetas
 
     #frames principales
-    marco_principal = ttk.Frame(ventana, padding=(20, 20, 20, 20))
-    marco_principal.grid(row=0, column=0, sticky="nsew")
-    ventana.columnconfigure(0, weight=1)
-    ventana.rowconfigure(0, weight=1)
+    marco_principal = ttk.Frame(ventana, padding=(20, 20, 20, 20)) #frame principal con padding
+    marco_principal.grid(row=0, column=0, sticky="nsew") #coloca el frame en la ventana
+    ventana.columnconfigure(0, weight=1) #permite expansión horizontal
+    ventana.rowconfigure(0, weight=1) #permite expansión vertical
 
-    marco_izq = ttk.Frame(marco_principal)
-    marco_der = ttk.Frame(marco_principal)
-    marco_izq.grid(row=2, column=0, padx=(10, 30), sticky="n")
-    marco_der.grid(row=2, column=1, padx=(30, 10), sticky="n")
+    marco_izq = ttk.Frame(marco_principal) #frame para columna izquierda
+    marco_der = ttk.Frame(marco_principal) #frame para columna derecha
+    marco_izq.grid(row=2, column=0, padx=(10, 30), sticky="n") #coloca frame izquierdo
+    marco_der.grid(row=2, column=1, padx=(30, 10), sticky="n") #coloca frame derecho
 
-    etiqueta_encabezado = ttk.Label(marco_principal, text="Seleccione las siguientes opciones:", anchor="center")
-    etiqueta_encabezado.grid(row=0, column=0, columnspan=2, pady=(0, 20), sticky="ew")
+    etiqueta_encabezado = ttk.Label(marco_principal, text="Seleccione las siguientes opciones:", anchor="center") #etiqueta de encabezado
+    etiqueta_encabezado.grid(row=0, column=0, columnspan=2, pady=(0, 20), sticky="ew") #coloca la etiqueta
 
-    btn_agregar_recorrido = ttk.Button(marco_principal, text="Agregar recorrido")
-    btn_agregar_recorrido.grid(row=1, column=0, columnspan=1, sticky="w", pady=(0, 12))
+    btn_agregar_recorrido = ttk.Button(marco_principal, text="Agregar recorrido") #botón para agregar recorrido
+    btn_agregar_recorrido.grid(row=1, column=0, columnspan=1, sticky="w", pady=(0, 12)) #coloca el botón
 
-    entrada_texto = ttk.Entry(marco_principal, width=90)
-    entrada_texto.insert(0, "")
-    entrada_texto.grid(row=1, column=0, columnspan=2, pady=(50, 20), sticky="ew")
+    entrada_texto = ttk.Entry(marco_principal, width=90) #entrada de texto para recorrido/ruta
+    entrada_texto.insert(0, "") #inicializa vacía
+    entrada_texto.grid(row=1, column=0, columnspan=2, pady=(50, 20), sticky="ew") #coloca la entrada
 
     #columna izquierda
-    btn_agregar_empresa = ttk.Button(marco_izq, text="Agregar empresa")
-    btn_agregar_empresa.grid(row=0, column=0, pady=(0, 8), sticky="w")
+    btn_agregar_empresa = ttk.Button(marco_izq, text="Agregar empresa") #botón para agregar empresa
+    btn_agregar_empresa.grid(row=0, column=0, pady=(0, 8), sticky="w") #coloca el botón
 
-    empresa_var = tk.StringVar()
+    empresa_var = tk.StringVar() #variable para empresa seleccionada
     combo_empresa = ttk.Combobox(
         marco_izq, textvariable=empresa_var,
         values=opciones_empresa, state="readonly", width=35
-    )
-    combo_empresa.set("Seleccione una empresa...")
-    combo_empresa.grid(row=1, column=0, pady=(0, 12), sticky="w")
+    ) #combobox para seleccionar empresa
+    combo_empresa.set("Seleccione una empresa...") #texto inicial
+    combo_empresa.grid(row=1, column=0, pady=(0, 12), sticky="w") #coloca el combobox
 
-    ttk.Label(marco_izq, text="Capacidad mínima").grid(row=2, column=0, sticky="w")
-    capacidad_min_var = tk.StringVar()
-    entrada_capacidad_min = ttk.Entry(marco_izq, textvariable=capacidad_min_var, width=30)
-    entrada_capacidad_min.grid(row=3, column=0, pady=(0, 12), sticky="w")
+    ttk.Label(marco_izq, text="Capacidad mínima").grid(row=2, column=0, sticky="w") #etiqueta capacidad mínima
+    capacidad_min_var = tk.StringVar() #variable para capacidad mínima
+    entrada_capacidad_min = ttk.Entry(marco_izq, textvariable=capacidad_min_var, width=30) #entrada para capacidad mínima
+    entrada_capacidad_min.grid(row=3, column=0, pady=(0, 12), sticky="w") #coloca la entrada
 
-    ttk.Label(marco_izq, text="Frecuencia hora pico").grid(row=4, column=0, sticky="w")
-    frecuencia_pico_var = tk.StringVar()
-    entrada_frecuencia_pico = ttk.Entry(marco_izq, textvariable=frecuencia_pico_var, width=30)
-    entrada_frecuencia_pico.grid(row=5, column=0, pady=(0, 12), sticky="w")
+    ttk.Label(marco_izq, text="Frecuencia hora pico").grid(row=4, column=0, sticky="w") #etiqueta frecuencia pico
+    frecuencia_pico_var = tk.StringVar() #variable para frecuencia pico
+    entrada_frecuencia_pico = ttk.Entry(marco_izq, textvariable=frecuencia_pico_var, width=30) #entrada para frecuencia pico
+    entrada_frecuencia_pico.grid(row=5, column=0, pady=(0, 12), sticky="w") #coloca la entrada
 
-    ttk.Label(marco_izq, text="Hora primer despacho").grid(row=6, column=0, sticky="w")
-    hora_primer_var = tk.StringVar()
+    ttk.Label(marco_izq, text="Hora primer despacho").grid(row=6, column=0, sticky="w") #etiqueta hora primer despacho
+    hora_primer_var = tk.StringVar() #variable para hora primer despacho
     combo_hora_primer = ttk.Combobox(
         marco_izq, textvariable=hora_primer_var,
         values=horas_primer_despacho, width=30, state="readonly"
-    )
-    combo_hora_primer.set("Seleccione hora...")
-    combo_hora_primer.grid(row=7, column=0, pady=(0, 12), sticky="w")
+    ) #combobox para seleccionar hora primer despacho
+    combo_hora_primer.set("Seleccione hora...") #texto inicial
+    combo_hora_primer.grid(row=7, column=0, pady=(0, 12), sticky="w") #coloca el combobox
 
-    ttk.Label(marco_izq, text="Longitud (km)").grid(row=8, column=0, sticky="w")
-    longitud_var = tk.StringVar()
-    entrada_longitud = ttk.Entry(marco_izq, textvariable=longitud_var, width=30)
-    entrada_longitud.grid(row=9, column=0, pady=(0, 20), sticky="w")
+    ttk.Label(marco_izq, text="Longitud (km)").grid(row=8, column=0, sticky="w") #etiqueta longitud
+    longitud_var = tk.StringVar() #variable para longitud
+    entrada_longitud = ttk.Entry(marco_izq, textvariable=longitud_var, width=30) #entrada para longitud
+    entrada_longitud.grid(row=9, column=0, pady=(0, 20), sticky="w") #coloca la entrada
 
-    def cancelar():
+    def cancelar(): #función para cerrar ventana
         ventana.destroy()
 
-    btn_cancelar = ttk.Button(marco_izq, text="Cancelar", command=cancelar)
-    btn_cancelar.grid(row=10, column=0, pady=(30, 0), sticky="w")
+    btn_cancelar = ttk.Button(marco_izq, text="Cancelar", command=cancelar) #botón cancelar
+    btn_cancelar.grid(row=10, column=0, pady=(30, 0), sticky="w") #coloca el botón
 
     #columna derecha
-    btn_agregar_terminal = ttk.Button(marco_der, text="Agregar terminal")
-    btn_agregar_terminal.grid(row=0, column=0, pady=(0, 8), sticky="e")
+    btn_agregar_terminal = ttk.Button(marco_der, text="Agregar terminal") #botón para agregar terminal
+    btn_agregar_terminal.grid(row=0, column=0, pady=(0, 8), sticky="e") #coloca el botón
 
-    terminal_var = tk.StringVar()
+    terminal_var = tk.StringVar() #variable para terminal seleccionada
     combo_terminal = ttk.Combobox(
         marco_der, textvariable=terminal_var,
         values=opciones_terminal, state="readonly", width=35
-    )
-    combo_terminal.set("Seleccione un terminal...")
-    combo_terminal.grid(row=1, column=0, pady=(0, 12), sticky="e")
+    ) #combobox para seleccionar terminal
+    combo_terminal.set("Seleccione un terminal...") #texto inicial
+    combo_terminal.grid(row=1, column=0, pady=(0, 12), sticky="e") #coloca el combobox
 
-    ttk.Label(marco_der, text="Capacidad máxima").grid(row=2, column=0, sticky="e")
-    capacidad_max_var = tk.StringVar()
-    entrada_capacidad_max = ttk.Entry(marco_der, textvariable=capacidad_max_var, width=30)
-    entrada_capacidad_max.grid(row=3, column=0, pady=(0, 12), sticky="e")
+    ttk.Label(marco_der, text="Capacidad máxima").grid(row=2, column=0, sticky="e") #etiqueta capacidad máxima
+    capacidad_max_var = tk.StringVar() #variable para capacidad máxima
+    entrada_capacidad_max = ttk.Entry(marco_der, textvariable=capacidad_max_var, width=30) #entrada para capacidad máxima
+    entrada_capacidad_max.grid(row=3, column=0, pady=(0, 12), sticky="e") #coloca la entrada
 
-    ttk.Label(marco_der, text="Frecuencia hora valle").grid(row=4, column=0, sticky="e")
-    frecuencia_valle_var = tk.StringVar()
-    entrada_frecuencia_valle = ttk.Entry(marco_der, textvariable=frecuencia_valle_var, width=30)
-    entrada_frecuencia_valle.grid(row=5, column=0, pady=(0, 12), sticky="e")
+    ttk.Label(marco_der, text="Frecuencia hora valle").grid(row=4, column=0, sticky="e") #etiqueta frecuencia valle
+    frecuencia_valle_var = tk.StringVar() #variable para frecuencia valle
+    entrada_frecuencia_valle = ttk.Entry(marco_der, textvariable=frecuencia_valle_var, width=30) #entrada para frecuencia valle
+    entrada_frecuencia_valle.grid(row=5, column=0, pady=(0, 12), sticky="e") #coloca la entrada
 
-    ttk.Label(marco_der, text="Hora último despacho").grid(row=6, column=0, sticky="e")
-    hora_ultimo_var = tk.StringVar()
+    ttk.Label(marco_der, text="Hora último despacho").grid(row=6, column=0, sticky="e") #etiqueta hora último despacho
+    hora_ultimo_var = tk.StringVar() #variable para hora último despacho
     combo_hora_ultimo = ttk.Combobox(
         marco_der, textvariable=hora_ultimo_var,
         values=horas_ultimo_despacho, width=30, state="readonly"
-    )
-    combo_hora_ultimo.set("Seleccione hora...")
-    combo_hora_ultimo.grid(row=7, column=0, pady=(0, 12), sticky="e")
+    ) #combobox para seleccionar hora último despacho
+    combo_hora_ultimo.set("Seleccione hora...") #texto inicial
+    combo_hora_ultimo.grid(row=7, column=0, pady=(0, 12), sticky="e") #coloca el combobox
 
-    ttk.Label(marco_der, text="Clase").grid(row=8, column=0, sticky="e")
-    clase_var = tk.StringVar()
+    ttk.Label(marco_der, text="Clase").grid(row=8, column=0, sticky="e") #etiqueta clase
+    clase_var = tk.StringVar() #variable para clase seleccionada
     combo_clase = ttk.Combobox(
         marco_der, textvariable=clase_var,
         values=opciones_clase, width=30, state="readonly"
-    )
-    combo_clase.set("Seleccione clase...")
-    combo_clase.grid(row=9, column=0, pady=(0, 20), sticky="e")
+    ) #combobox para seleccionar clase
+    combo_clase.set("Seleccione clase...") #texto inicial
+    combo_clase.grid(row=9, column=0, pady=(0, 20), sticky="e") #coloca el combobox
 
     #guardar datos con autenticacion y persistencia
-    def guardar():
+    def guardar(): #función para guardar los datos ingresados
         #recolectar datos del formulario
         datos = {
             "empresa": empresa_var.get().strip(),
@@ -1108,8 +1107,7 @@ def ventana_emergente_4(padre):
 
         #agregar fila a df global
         try:
-            #declarar globals que vamos a modificar
-            global df, df_filtrado, terminales, lugares
+            global df, df_filtrado, terminales, lugares #declarar variables globales que se van a modificar
 
             #calcular nuevo codigo para el indice 'codigo' (índice del DataFrame)
             try:
@@ -1170,7 +1168,6 @@ def ventana_emergente_4(padre):
                 if nuevo_codigo in df_filtrado.index:
                     df_filtrado.loc[nuevo_codigo] = fila
                 else:
-                    #si df_filtrado no contiene algunas columnas, lo intentamos añadir de forma segura
                     df_filtrado = df_filtrado.reindex(df.index)  #sincroniza índices y columnas mínimas
                     df_filtrado.loc[nuevo_codigo] = fila
                 #actualizar empresa_limpia si aplica
@@ -1240,10 +1237,10 @@ def ventana_emergente_4(padre):
 
         ventana.destroy()
 
-    btn_guardar = ttk.Button(marco_der, text="Guardar", command=guardar)
-    btn_guardar.grid(row=10, column=0, pady=(30, 0), sticky="e")
+    btn_guardar = ttk.Button(marco_der, text="Guardar", command=guardar) #botón para guardar datos
+    btn_guardar.grid(row=10, column=0, pady=(30, 0), sticky="e") #coloca el botón
 
-    marco_principal.columnconfigure(0, weight=1)
+    marco_principal.columnconfigure(0, weight=1) #permite expansión horizontal
     marco_principal.columnconfigure(1, weight=1)
     marco_izq.columnconfigure(0, weight=1)
     marco_der.columnconfigure(0, weight=1)
@@ -1483,24 +1480,24 @@ def cerrar_ventana(vent):
 ventana.mainloop()
 
 #creacion archivo excel; lo ultimito
-df.to_excel("Excel_RUTAS_TRANSPORTE_URBANO.xlsx", index=False)
-print("Guardado Excel_RUTAS_TRANSPORTE_URBANO.xlsx")
+df.to_excel("Excel_RUTAS_TRANSPORTE_URBANO.xlsx", index=False) #guarda el dataframe en un archivo excel sin el índice
+print("Guardado Excel_RUTAS_TRANSPORTE_URBANO.xlsx") #imprime mensaje de confirmación en consola
 
-cant_total = len(df_filtrado)
-prom_gen_max = df_filtrado["capacidad_maxima"].mean()
-prom_gen_min = df_filtrado["capacidad_minima"].mean()
-prom_frec_pico = df_filtrado["frecuencia_de_despacho_hora_pico"].mean()
-prom_frec_valle = df_filtrado["frecuencia_despacho_hora_valle"].mean()
+cant_total = len(df_filtrado) #calcula la cantidad total de vehículos registrados en el dataframe filtrado
+prom_gen_max = df_filtrado["capacidad_maxima"].mean() #calcula el promedio de la capacidad máxima
+prom_gen_min = df_filtrado["capacidad_minima"].mean() #calcula el promedio de la capacidad mínima
+prom_frec_pico = df_filtrado["frecuencia_de_despacho_hora_pico"].mean() #calcula el promedio de la frecuencia de despacho en hora pico
+prom_frec_valle = df_filtrado["frecuencia_despacho_hora_valle"].mean() #calcula el promedio de la frecuencia de despacho en hora valle
 
-df_filtrado["long_km"] = pd.to_numeric(df_filtrado["long_km"], errors="coerce") # convierte los numeros que estan guardados como string a numeros operables
-prom_km = df_filtrado["long_km"].mean()
+df_filtrado["long_km"] = pd.to_numeric(df_filtrado["long_km"], errors="coerce") #convierte la columna long_km a valores numéricos, ignorando errores
+prom_km = df_filtrado["long_km"].mean() #calcula el promedio de kilómetros recorridos
 
 mindf = {
-    "Cantidad de veiculos registrados" : cant_total,
-    "Promedio Capacidad Maxima" : round(prom_gen_max,2),
-    "Promedio Capacidad Minima" : round(prom_gen_min,2),
-    "Promedio Frecuencia de despacho en hora pico" : round(prom_frec_pico,2),
-    "Promedio Frecuencia de despacho en hora valle" : round(prom_frec_valle,2),
-    "Promedio de Kilometros" : round(prom_km, 2)
+    "Cantidad de veiculos registrados" : cant_total, #guarda la cantidad total de vehículos
+    "Promedio Capacidad Maxima" : round(prom_gen_max,2), #guarda el promedio de capacidad máxima redondeado a 2 decimales
+    "Promedio Capacidad Minima" : round(prom_gen_min,2), #guarda el promedio de capacidad mínima redondeado a 2 decimales
+    "Promedio Frecuencia de despacho en hora pico" : round(prom_frec_pico,2), #guarda el promedio de frecuencia en hora pico redondeado a 2 decimales
+    "Promedio Frecuencia de despacho en hora valle" : round(prom_frec_valle,2), #guarda el promedio de frecuencia en hora valle redondeado a 2 decimales
+    "Promedio de Kilometros" : round(prom_km, 2) #guarda el promedio de kilómetros redondeado a 2 decimales
 }
-minidata = pd.DataFrame([mindf])
+minidata = pd.DataFrame([mindf]) #crea un dataframe con los datos estadísticos mínimos
